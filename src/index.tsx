@@ -1,7 +1,8 @@
 import { definePlugin, staticClasses } from '@decky/ui'
-import { routerHook } from '@decky/api'
+import { routerHook, call, toaster } from '@decky/api'
 
 import { GiMusicalNotes } from 'react-icons/gi'
+import { FaDownload } from 'react-icons/fa'
 
 import Settings from './components/settings'
 import patchLibraryApp from './lib/patchLibraryApp'
@@ -14,9 +15,39 @@ import {
 
 import { name } from '@decky/manifest'
 
+type UpdateCheckResponse = {
+  success: boolean
+  current_version?: string
+  latest_version?: string
+  update_available?: boolean
+  error?: string
+}
+
+// Check for yt-dlp updates on plugin load
+async function checkYtdlpUpdateOnLoad() {
+  try {
+    const result = await call<[], UpdateCheckResponse>('check_ytdlp_update')
+    if (result.success && result.update_available) {
+      toaster.toast({
+        title: 'DeckTunes: yt-dlp Update Available',
+        body: `${result.current_version} → ${result.latest_version}. Update in plugin settings.`,
+        icon: <FaDownload />,
+        duration: 5000
+      })
+    }
+  } catch (e) {
+    console.error('[DeckTunes] Failed to check yt-dlp update on load:', e)
+  }
+}
+
 export default definePlugin(() => {
   const state: AudioLoaderCompatState = new AudioLoaderCompatState()
   const libraryPatch = patchLibraryApp(state)
+
+  // Check for yt-dlp updates after a short delay (let plugin fully initialize)
+  setTimeout(() => {
+    checkYtdlpUpdateOnLoad()
+  }, 3000)
 
   routerHook.addRoute(
     '/gamethememusic/:appid',

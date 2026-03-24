@@ -15,10 +15,15 @@
 - ⚙️ **Customizable** - Volume control, auto-play toggle, loop settings
 - 🔌 **Backwards compatible** - Imports settings from SDH-GameThemeMusic
 
-## 🆕 What's New in v1.8.0
+## 🆕 What's New in DeckTunes
 
+### v1.8.6
+- ✅ **yt-dlp update notification on load** - Get notified when an update is available
+- ✅ **Fixed context menu crash** on Oct 2025+ Steam client updates
+
+### v1.8.5
 - ✅ **Fixed critical audio playback issue** caused by March 2026 Steam Deck updates
-- ✅ **yt-dlp auto-update** functionality with manual controls
+- ✅ **yt-dlp auto-update** functionality with manual controls in settings
 - ✅ **Modernized dependencies** for better reliability and security
 - ✅ **Improved error handling** and logging throughout
 - ✅ **CI/CD pipeline** for automated builds and releases
