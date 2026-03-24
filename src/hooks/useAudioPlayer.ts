@@ -12,7 +12,11 @@ const useAudioPlayer = (
   isPlaying: boolean
   isReady: boolean
 } => {
-  const { setOnThemePage, onAppPage } = useAudioLoaderCompatState()
+  const context = useAudioLoaderCompatState()
+  // Defensive: context may be null if rendered outside AudioLoaderCompatStateContextProvider
+  const setOnThemePage = context?.setOnThemePage ?? (() => {})
+  const onAppPage = context?.onAppPage ?? false
+
   if (!onAppPage) {
     setOnThemePage(true)
   }
