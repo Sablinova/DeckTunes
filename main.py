@@ -5,12 +5,14 @@ import os
 import random
 import ssl
 import subprocess
+import threading
 import aiohttp
-from aiohttp import web
 import certifi
 import logging
 import platform
 import shutil
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from functools import partial
 
 import decky
 from settings import SettingsManager  # type: ignore
@@ -24,6 +26,36 @@ def get_ytdlp_path() -> str:
     return os.path.join(decky.DECKY_PLUGIN_DIR, "bin", binary)
 
 
+class AudioHTTPRequestHandler(SimpleHTTPRequestHandler):
+    """Simple HTTP handler for serving audio files"""
+
+    def __init__(self, *args, music_path: str, **kwargs):
+        self.music_path = music_path
+        super().__init__(*args, directory=music_path, **kwargs)
+
+    def log_message(self, format, *args):
+        logger.info(f"AudioServer: {format % args}")
+
+    def do_GET(self):
+        # Only serve files from /audio/ path
+        if self.path.startswith("/audio/"):
+            filename = self.path[7:]  # Remove /audio/ prefix
+
+            # Sanitize filename
+            if ".." in filename or "/" in filename or "\\" in filename:
+                self.send_error(400, "Invalid filename")
+                return
+
+            filepath = os.path.join(self.music_path, filename)
+            if os.path.exists(filepath) and os.path.isfile(filepath):
+                self.path = "/" + filename
+                super().do_GET()
+            else:
+                self.send_error(404, "File not found")
+        else:
+            self.send_error(404, "Not found")
+
+
 class Plugin:
     yt_process: asyncio.subprocess.Process | None = None
     yt_process_lock = asyncio.Lock()
@@ -33,9 +65,8 @@ class Plugin:
 
     # HTTP server for audio playback
     audio_port: int | None = None
-    app: web.Application | None = None
-    runner: web.AppRunner | None = None
-    site: web.TCPSite | None = None
+    http_server: HTTPServer | None = None
+    server_thread: threading.Thread | None = None
 
     async def _migrate_old_settings(self):
         """Migrate settings and music files from SDH-GameThemeMusic if they exist."""
@@ -102,6 +133,32 @@ class Plugin:
 
         logger.info("No old SDH-GameThemeMusic settings found to migrate")
 
+    def _start_http_server(self):
+        """Start the HTTP server in a separate thread"""
+        # Ensure music directory exists
+        os.makedirs(self.music_path, exist_ok=True)
+
+        # Try to bind to a random port
+        for _ in range(5):
+            try:
+                self.audio_port = random.randint(30000, 40000)
+                handler = partial(AudioHTTPRequestHandler, music_path=self.music_path)
+                self.http_server = HTTPServer(("localhost", self.audio_port), handler)
+                self.server_thread = threading.Thread(
+                    target=self.http_server.serve_forever, daemon=True
+                )
+                self.server_thread.start()
+                logger.info(f"DeckTunes audio server started on port {self.audio_port}")
+                return True
+            except OSError as e:
+                logger.warning(
+                    f"Failed to bind audio server to port {self.audio_port}: {e}. Retrying..."
+                )
+                self.http_server = None
+
+        logger.error("Failed to start audio server after 5 attempts.")
+        return False
+
     async def _main(self):
         logger.info("Initializing DeckTunes...")
         self.settings = SettingsManager(
@@ -112,39 +169,18 @@ class Plugin:
         # Migrate old SDH-GameThemeMusic settings if they exist
         await self._migrate_old_settings()
 
-        # Initialize HTTP server for serving audio files
-        self.app = web.Application()
-        self.app.router.add_get("/audio/{filename}", self.serve_audio_file)
-        self.runner = web.AppRunner(self.app)
-        await self.runner.setup()
-
-        # Try to bind to a random port
-        for _ in range(5):
-            try:
-                self.audio_port = random.randint(30000, 40000)
-                self.site = web.TCPSite(self.runner, "localhost", self.audio_port)
-                await self.site.start()
-                logger.info(f"DeckTunes audio server started on port {self.audio_port}")
-                break
-            except OSError as e:
-                logger.warning(
-                    f"Failed to bind audio server to port {self.audio_port}: {e}. Retrying..."
-                )
-                self.site = None
-
-        if not self.site:
-            logger.error("Failed to start audio server after 5 attempts.")
+        # Start HTTP server for serving audio files
+        self._start_http_server()
 
     async def _unload(self):
         logger.info("Unloading DeckTunes...")
 
         # Stop HTTP server
-        if self.site:
-            await self.site.stop()
-            logger.info("Audio server site stopped")
-        if self.runner:
-            await self.runner.cleanup()
-            logger.info("Audio server runner cleaned up")
+        if self.http_server:
+            logger.info("Shutting down audio server...")
+            self.http_server.shutdown()
+            self.http_server = None
+            logger.info("Audio server stopped")
 
         # Terminate yt-dlp process if running
         if self.yt_process is not None and self.yt_process.returncode is None:
@@ -158,29 +194,6 @@ class Plugin:
                     self.yt_process.kill()
 
         logger.info("DeckTunes unloaded successfully")
-
-    async def serve_audio_file(self, request):
-        """Serve audio files from the music directory via HTTP"""
-        try:
-            filename = request.match_info["filename"]
-
-            # Sanitize filename to prevent directory traversal
-            if ".." in filename or "/" in filename or "\\" in filename:
-                logger.error(f"Invalid filename requested: {filename}")
-                return web.Response(status=400, text="Invalid filename")
-
-            filepath = os.path.join(self.music_path, filename)
-
-            if not os.path.exists(filepath):
-                logger.error(f"Audio file not found: {filepath}")
-                return web.Response(status=404, text="File not found")
-
-            logger.info(f"Serving audio file: {filename}")
-            return web.FileResponse(filepath)
-
-        except Exception as e:
-            logger.error(f"Error serving audio file: {e}")
-            return web.Response(status=500, text="Internal server error")
 
     async def get_audio_port(self):
         """Return the HTTP server port to frontend"""
