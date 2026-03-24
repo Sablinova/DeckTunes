@@ -1,7 +1,7 @@
 {
-  "name": "sdh-gamethememusic",
-  "version": "1.7.11",
-  "description": "Play theme songs on your game pages",
+  "name": "decktunes",
+  "version": "1.8.0",
+  "description": "Automatic game theme music for Steam Deck",
   "type": "module",
   "scripts": {
     "build": "rollup -c",
@@ -10,26 +10,28 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/moraroy/SDH-GameThemeMusic.git"
+    "url": "git+https://github.com/Sablinova/DeckTunes.git"
   },
   "keywords": [
     "decky",
     "plugin",
-    "plugin-template",
     "steam-deck",
-    "deck"
+    "deck",
+    "music",
+    "audio",
+    "themes"
   ],
-  "author": "OMGDuke, moraroy",
+  "author": "Sablinova",
   "license": "GPL-2.0-or-later",
   "bugs": {
-    "url": "https://github.com/moraroy/SDH-GameThemeMusic/issues"
+    "url": "https://github.com/Sablinova/DeckTunes/issues"
   },
-  "homepage": "https://github.com/moraroy/SDH-GameThemeMusic#readme",
+  "homepage": "https://github.com/Sablinova/DeckTunes#readme",
   "remote_binary": [
     {
       "name": "yt-dlp",
-      "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2025.06.09/yt-dlp",
-      "sha256hash": "efba94b3be7911b96bf35bb7437dcf218ab7d244def6d57982af5609f9aeeeb0"
+      "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/yt-dlp",
+      "sha256hash": "3bda0968a01cde70d26720653003b28553c71be14dcb2e5f4c24e9921fdad745"
     }
   ],
   "devDependencies": {

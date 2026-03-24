@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Package release
+        run: |
+          mkdir -p DeckTunes
+          cp -r dist bin package.json plugin.json main.py README.md CHANGELOG.md LICENSE DeckTunes/
+          zip -r DeckTunes.zip DeckTunes/
+          tar -czvf DeckTunes.tar.gz DeckTunes/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            DeckTunes.zip
+            DeckTunes.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

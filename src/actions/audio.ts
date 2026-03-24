@@ -133,12 +133,16 @@ class YtDlpAudioResolver extends AudioResolver {
       return video.url
     } else {
       // We need to retrieve the audio URL first.
-      // This may return a local filesystem URL if the file has been downloaded before.
-      const result = await call<[string], string | null>(
+      // This may return a local HTTP URL if the file has been downloaded before,
+      // or a direct streaming URL from YouTube.
+      const result = await call<[string], { success: boolean; url?: string; error?: string } | null>(
         'single_yt_url',
         video.id
       )
-      return result || undefined
+      if (result && result.success && result.url) {
+        return result.url
+      }
+      return undefined
     }
   }
 

@@ -38,6 +38,7 @@ import useInvidiousInstances from '../../hooks/useInvidiousInstances'
 import { toaster } from '@decky/api'
 import { getResolver } from '../../actions/audio'
 import PanelSocialButton from './socialButton'
+import YtdlpUpdateSection from './YtdlpUpdateSection'
 
 export default function Index() {
   const {
@@ -262,6 +263,7 @@ export default function Index() {
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>
+      {settings.useYtDlp && <YtdlpUpdateSection />}
       <PanelSection title={t('overrides')}>
         <PanelSectionRow>
           <ButtonItem

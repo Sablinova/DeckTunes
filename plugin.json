@@ -1,11 +1,11 @@
 {
-  "name": "Game Theme Music",
-  "author": "OMGDuke, moraroy",
+  "name": "DeckTunes",
+  "author": "Sablinova",
   "flags": [],
   "api_version": 1,
   "publish": {
-    "tags": ["audio"],
-    "description": "Play theme songs on your game pages",
-    "image": "https://raw.githubusercontent.com/moraroy/SDH-GameThemeMusic/main/assets/publish_image.png"
+    "tags": ["audio", "music", "themes", "entertainment"],
+    "description": "Automatic game theme music for Steam Deck - Modernized fork with reliability fixes",
+    "image": "https://raw.githubusercontent.com/Sablinova/DeckTunes/main/assets/publish_image.png"
   }
 }

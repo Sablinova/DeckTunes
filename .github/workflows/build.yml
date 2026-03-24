@@ -1,74 +1,39 @@
-name: Build and Release Game Theme Music
+name: Build
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [ main, master ]
   pull_request:
-    branches: ['main']
-  workflow_dispatch:
+    branches: [ main, master ]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Install Dependencies
-        run: pnpm install
-
-      - name: Build frontend
-        run: pnpm run build
-
-      - name: Download Decky Plugin CLI
-        run: |
-          mkdir $(pwd)/cli
-          curl -L -o $(pwd)/cli/decky "https://github.com/SteamDeckHomebrew/cli/releases/latest/download/decky-linux-x86_64"
-          chmod +x $(pwd)/cli/decky
-
-      - name: Build plugin
-        run: |
-          $(pwd)/cli/decky plugin build $(pwd)
-          unzip "out/Game Theme Music.zip" -d "out/Game Theme Music"
-
-      - name: Upload package
-        uses: actions/upload-artifact@v4
-        with:
-          name: SDH-GameThemeMusic
-          path: |
-            ./out/Game Theme Music/*
-
-  release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: SDH-GameThemeMusic
-          path: SDH-GameThemeMusic
-
-      - name: zip/tar release
-        run: |
-          zip -r SDH-GameThemeMusic.zip SDH-GameThemeMusic/*
-          tar -czvf SDH-GameThemeMusic.tar.gz SDH-GameThemeMusic
-
-      - name: Create a release
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: 'SDH-GameThemeMusic.zip,SDH-GameThemeMusic.tar.gz'
-          allowUpdates: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build plugin
+      run: npm run build
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: DeckTunes-build
+        path: |
+          dist/
+          bin/
+          package.json
+          plugin.json
+          main.py
+          README.md
+          CHANGELOG.md
+          LICENSE
