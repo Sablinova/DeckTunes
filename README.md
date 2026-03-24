@@ -18,7 +18,7 @@
 ## 🆕 What's New in v1.8.0
 
 - ✅ **Fixed critical audio playback issue** caused by March 2026 Steam Deck updates
-- ✅ **yt-dlp auto-update** functionality with manual controls and optional auto-check
+- ✅ **yt-dlp auto-update** functionality with manual controls
 - ✅ **Modernized dependencies** for better reliability and security
 - ✅ **Improved error handling** and logging throughout
 - ✅ **CI/CD pipeline** for automated builds and releases
@@ -63,13 +63,11 @@
 ### Audio Settings
 - **Volume** - Adjust theme music volume (0-100%)
 - **Auto-play** - Automatically play themes when viewing games
-- **Loop** - Loop theme music continuously
 
 ### yt-dlp Updates
 - **Current Version** - Shows installed yt-dlp version
 - **Latest Version** - Shows latest available version
 - **Update Button** - Manually update yt-dlp
-- **Auto-check** - Automatically check for updates on plugin load (off by default)
 
 ## 🤝 Compatibility
 

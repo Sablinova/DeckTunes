@@ -3,6 +3,22 @@ import { call, toaster } from '@decky/api'
 import { useState } from 'react'
 import { FaSync, FaDownload, FaCheck } from 'react-icons/fa'
 
+type UpdateCheckResponse = {
+  success: boolean
+  current_version?: string
+  latest_version?: string
+  update_available?: boolean
+  error?: string
+}
+
+type UpdatePerformResponse = {
+  success: boolean
+  old_version?: string
+  new_version?: string
+  version?: string
+  error?: string
+}
+
 export default function YtdlpUpdateSection() {
   const [checking, setChecking] = useState(false)
   const [updating, setUpdating] = useState(false)
@@ -15,7 +31,7 @@ export default function YtdlpUpdateSection() {
   async function checkForUpdates() {
     setChecking(true)
     try {
-      const result = await call<[], any>('check_ytdlp_update')
+      const result = await call<[], UpdateCheckResponse>('check_ytdlp_update')
       if (result.success) {
         setUpdateInfo(result)
         if (result.update_available) {
@@ -56,7 +72,7 @@ export default function YtdlpUpdateSection() {
   async function performUpdate() {
     setUpdating(true)
     try {
-      const result = await call<[], any>('update_ytdlp')
+      const result = await call<[], UpdatePerformResponse>('update_ytdlp')
       if (result.success) {
         toaster.toast({
           title: 'yt-dlp Updated Successfully',

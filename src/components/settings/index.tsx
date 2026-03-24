@@ -54,7 +54,6 @@ export default function Index() {
   const t = useTranslations()
 
   const { instances, instancesLoading } = useInvidiousInstances()
-  console.log(instances)
 
   const instanceOptions = useMemo<SingleDropdownOption[]>(
     () =>

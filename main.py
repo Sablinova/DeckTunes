@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import datetime
 import json
 import os
@@ -51,9 +50,6 @@ class Plugin:
             return
 
         for old_name in old_plugin_names:
-            old_plugin_dir = os.path.join(
-                os.path.dirname(decky.DECKY_PLUGIN_DIR), old_name
-            )
             old_settings_dir = os.path.join(
                 os.path.dirname(decky.DECKY_PLUGIN_SETTINGS_DIR), old_name
             )
@@ -117,14 +113,27 @@ class Plugin:
         await self._migrate_old_settings()
 
         # Initialize HTTP server for serving audio files
-        self.audio_port = random.randint(30000, 40000)
         self.app = web.Application()
         self.app.router.add_get("/audio/{filename}", self.serve_audio_file)
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
-        self.site = web.TCPSite(self.runner, "localhost", self.audio_port)
-        await self.site.start()
-        logger.info(f"DeckTunes audio server started on port {self.audio_port}")
+
+        # Try to bind to a random port
+        for _ in range(5):
+            try:
+                self.audio_port = random.randint(30000, 40000)
+                self.site = web.TCPSite(self.runner, "localhost", self.audio_port)
+                await self.site.start()
+                logger.info(f"DeckTunes audio server started on port {self.audio_port}")
+                break
+            except OSError as e:
+                logger.warning(
+                    f"Failed to bind audio server to port {self.audio_port}: {e}. Retrying..."
+                )
+                self.site = None
+
+        if not self.site:
+            logger.error("Failed to start audio server after 5 attempts.")
 
     async def _unload(self):
         logger.info("Unloading DeckTunes...")
@@ -310,7 +319,8 @@ class Plugin:
 
     async def download_url(self, url: str, id: str):
         logger.info(f"Downloading file from URL: {url}")
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=600)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             res = await session.get(url, ssl=self.ssl_context)
             res.raise_for_status()
             file_path = os.path.join(self.music_path, f"{id}.webm")
@@ -400,7 +410,8 @@ class Plugin:
         """Fetch the latest yt-dlp release version from GitHub."""
         try:
             logger.info("Fetching latest yt-dlp release from GitHub...")
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
                     ssl=self.ssl_context,
@@ -476,12 +487,12 @@ class Plugin:
                 shutil.copy2(ytdlp_path, backup_path)
 
             # Download latest version
-            download_url = (
-                "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
-            )
+            binary_name = "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp"
+            download_url = f"https://github.com/yt-dlp/yt-dlp/releases/latest/download/{binary_name}"
             logger.info(f"Downloading latest yt-dlp from {download_url}")
 
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=600)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(download_url, ssl=self.ssl_context) as response:
                     if response.status != 200:
                         raise Exception(
