@@ -3,11 +3,14 @@ import {
   afterPatch,
   fakeRenderComponent,
   findInReactTree,
-  findModuleChild,
+  findInTree,
+  findModuleByExport,
+  Export,
   MenuItem,
   Navigation,
   Patch
 } from '@decky/ui'
+import { FC } from 'react'
 import useTranslations from '../hooks/useTranslations'
 
 function ChangeMusicButton({ appId }: { appId: number }) {
@@ -40,46 +43,44 @@ const spliceChangeMusic = (children: any[], appid: number) => {
   )
 }
 
-/**
- * Safely extract appid from a React component tree.
- * Uses findInReactTree to avoid hardcoded paths like _owner.pendingProps
- * which break when Valve updates the Steam UI structure.
- */
-const extractAppId = (component: any): number | null => {
-  // Try multiple methods to find the appid
-  
-  // Method 1: Look for appid in the component's props
-  const fromProps = findInReactTree(component, (node: any) => {
-    return node?.props?.overview?.appid || node?.overview?.appid
-  })
-  if (fromProps?.props?.overview?.appid) return fromProps.props.overview.appid
-  if (fromProps?.overview?.appid) return fromProps.overview.appid
-  
-  // Method 2: Search for appid directly in the tree
-  const withAppId = findInReactTree(component, (node: any) => {
-    return typeof node?.appid === 'number'
-  })
-  if (withAppId?.appid) return withAppId.appid
-  
-  // Method 3: Look for overview object anywhere in the tree
-  const withOverview = findInReactTree(component, (node: any) => {
-    return node?.overview && typeof node.overview.appid === 'number'
-  })
-  if (withOverview?.overview?.appid) return withOverview.overview.appid
-  
-  // Method 4: Legacy fallback - try the old path but with safety checks
-  try {
-    if (component?._owner?.pendingProps?.overview?.appid) {
-      return component._owner.pendingProps.overview.appid
-    }
-    if (component?._owner?.memoizedProps?.overview?.appid) {
-      return component._owner.memoizedProps.overview.appid
-    }
-  } catch {
-    // Ignore errors from legacy path
+// Check if correct menu by looking at the code of the onSelected function
+const isOpeningAppContextMenu = (items: any[]) => {
+  if (!items?.length) {
+    return false
   }
-  
-  return null
+  return !!findInReactTree(
+    items,
+    (x) => x?.props?.onSelected && x?.props?.onSelected.toString().includes('launchSource')
+  )
+}
+
+const handleItemDupes = (items: any[]) => {
+  const gtmIdx = items.findIndex((x: any) => x?.key === 'game-theme-music-change-music')
+  if (gtmIdx != -1) items.splice(gtmIdx, 1)
+}
+
+const patchMenuItems = (menuItems: any[], appid: number) => {
+  let updatedAppid: number = appid
+  // find the first menu component that has the correct appid, sometimes the one passed is cached from another context menu
+  const parentOverview = menuItems.find(
+    (x: any) =>
+      x?._owner?.pendingProps?.overview?.appid &&
+      x._owner.pendingProps.overview.appid !== appid
+  )
+  // if found then use that appid
+  if (parentOverview) {
+    updatedAppid = parentOverview._owner.pendingProps.overview.appid
+  }
+  // Oct 2025+ client - new structure
+  if (updatedAppid === appid) {
+    const foundApp = findInTree(menuItems, (x) => x?.app?.appid, {
+      walkable: ['props', 'children']
+    })
+    if (foundApp) {
+      updatedAppid = foundApp.app.appid
+    }
+  }
+  spliceChangeMusic(menuItems, updatedAppid)
 }
 
 /**
@@ -101,46 +102,60 @@ const contextMenuPatch = (LibraryContextMenu: any) => {
     LibraryContextMenu.prototype,
     'render',
     (_: Record<string, unknown>[], component: any) => {
-      const appid = extractAppId(component)
-      
-      // If we can't find an appid, don't crash - just skip adding the menu item
-      if (appid === null) {
-        console.warn('[DeckTunes] Could not extract appid from context menu component')
+      let appid: number = 0
+      if (component._owner?.pendingProps?.overview?.appid) {
+        appid = component._owner.pendingProps.overview.appid
+      } else {
+        // Oct 2025+ client - new structure
+        const foundApp = findInTree(component.props?.children, (x) => x?.app?.appid, {
+          walkable: ['props', 'children']
+        })
+        if (foundApp) {
+          appid = foundApp.app.appid
+        }
+      }
+
+      // If we still can't find an appid, skip patching this menu
+      if (appid === 0) {
         return component
       }
 
       if (!patches.inner) {
-        patches.inner = afterPatch(
-          component.type.prototype,
-          'shouldComponentUpdate',
-          ([nextProps]: any, shouldUpdate: any) => {
+        patches.inner = afterPatch(component, 'type', (_: any, ret: any) => {
+          // initial render
+          afterPatch(ret.type.prototype, 'render', (_: any, ret2: any) => {
+            const menuItems = ret2.props.children[0] // always the first child
+            if (!isOpeningAppContextMenu(menuItems)) return ret2
             try {
-              const gtmIdx = nextProps.children.findIndex(
-                (x: any) => x?.key === 'game-theme-music-change-music'
-              )
-              if (gtmIdx != -1) nextProps.children.splice(gtmIdx, 1)
+              handleItemDupes(menuItems)
             } catch {
-              return component
+              return ret2
             }
+            patchMenuItems(menuItems, appid)
+            return ret2
+          })
 
-            if (shouldUpdate === true) {
-              let updatedAppid: number = appid
-              
-              // Try to find updated appid from children using safe extraction
-              for (const child of nextProps.children || []) {
-                const childAppId = extractAppId(child)
-                if (childAppId !== null && childAppId !== appid) {
-                  updatedAppid = childAppId
-                  break
-                }
+          // when steam decides to refresh app overview
+          afterPatch(
+            ret.type.prototype,
+            'shouldComponentUpdate',
+            ([nextProps]: any, shouldUpdate: any) => {
+              try {
+                handleItemDupes(nextProps.children)
+              } catch {
+                // wrong context menu (probably)
+                return shouldUpdate
               }
-              
-              spliceChangeMusic(nextProps.children, updatedAppid)
-            }
 
-            return shouldUpdate
-          }
-        )
+              if (shouldUpdate === true) {
+                patchMenuItems(nextProps.children, appid)
+              }
+
+              return shouldUpdate
+            }
+          )
+          return ret
+        })
       } else {
         spliceChangeMusic(component.props.children, appid)
       }
@@ -159,22 +174,11 @@ const contextMenuPatch = (LibraryContextMenu: any) => {
  * Game context menu component.
  */
 export const LibraryContextMenu = fakeRenderComponent(
-  findModuleChild((m) => {
-    if (typeof m !== 'object') return
-    for (const prop in m) {
-      if (
-        m[prop]?.toString() &&
-        m[prop].toString().includes('().LibraryContextMenu')
-      ) {
-        return Object.values(m).find(
-          (sibling) =>
-            sibling?.toString().includes('createElement') &&
-            sibling?.toString().includes('navigator:')
-        )
-      }
-    }
-    return
-  })
+  Object.values(
+    findModuleByExport((e: Export) =>
+      e?.toString && e.toString().includes('().LibraryContextMenu')
+    )
+  ).find((sibling) => (sibling as FC)?.toString().includes('navigator:')) as FC
 ).type
 
 export default contextMenuPatch
