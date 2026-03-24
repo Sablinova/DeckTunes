@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,15 +19,41 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build plugin
+      - name: Build frontend
         run: npm run build
+
+      - name: Download Decky Plugin CLI
+        run: |
+          mkdir -p cli
+          curl -L -o cli/decky "https://github.com/SteamDeckHomebrew/cli/releases/latest/download/decky-linux-x86_64"
+          chmod +x cli/decky
+
+      - name: Build plugin
+        run: |
+          ./cli/decky plugin build .
+          unzip "out/DeckTunes.zip" -d "out/DeckTunes"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeckTunes
+          path: out/DeckTunes/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: DeckTunes
+          path: DeckTunes
 
       - name: Package release
         run: |
-          mkdir -p DeckTunes
-          cp -r dist bin package.json plugin.json main.py README.md CHANGELOG.md LICENSE DeckTunes/
-          zip -r DeckTunes.zip DeckTunes/
-          tar -czvf DeckTunes.tar.gz DeckTunes/
+          zip -r DeckTunes.zip DeckTunes/*
+          tar -czvf DeckTunes.tar.gz DeckTunes
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
