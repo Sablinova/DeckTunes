@@ -41,6 +41,48 @@ const spliceChangeMusic = (children: any[], appid: number) => {
 }
 
 /**
+ * Safely extract appid from a React component tree.
+ * Uses findInReactTree to avoid hardcoded paths like _owner.pendingProps
+ * which break when Valve updates the Steam UI structure.
+ */
+const extractAppId = (component: any): number | null => {
+  // Try multiple methods to find the appid
+  
+  // Method 1: Look for appid in the component's props
+  const fromProps = findInReactTree(component, (node: any) => {
+    return node?.props?.overview?.appid || node?.overview?.appid
+  })
+  if (fromProps?.props?.overview?.appid) return fromProps.props.overview.appid
+  if (fromProps?.overview?.appid) return fromProps.overview.appid
+  
+  // Method 2: Search for appid directly in the tree
+  const withAppId = findInReactTree(component, (node: any) => {
+    return typeof node?.appid === 'number'
+  })
+  if (withAppId?.appid) return withAppId.appid
+  
+  // Method 3: Look for overview object anywhere in the tree
+  const withOverview = findInReactTree(component, (node: any) => {
+    return node?.overview && typeof node.overview.appid === 'number'
+  })
+  if (withOverview?.overview?.appid) return withOverview.overview.appid
+  
+  // Method 4: Legacy fallback - try the old path but with safety checks
+  try {
+    if (component?._owner?.pendingProps?.overview?.appid) {
+      return component._owner.pendingProps.overview.appid
+    }
+    if (component?._owner?.memoizedProps?.overview?.appid) {
+      return component._owner.memoizedProps.overview.appid
+    }
+  } catch {
+    // Ignore errors from legacy path
+  }
+  
+  return null
+}
+
+/**
  * Patches the game context menu.
  * @param LibraryContextMenu The game context menu.
  * @returns A patch to remove when the plugin dismounts.
@@ -59,7 +101,13 @@ const contextMenuPatch = (LibraryContextMenu: any) => {
     LibraryContextMenu.prototype,
     'render',
     (_: Record<string, unknown>[], component: any) => {
-      const appid: number = component._owner.pendingProps.overview.appid
+      const appid = extractAppId(component)
+      
+      // If we can't find an appid, don't crash - just skip adding the menu item
+      if (appid === null) {
+        console.warn('[DeckTunes] Could not extract appid from context menu component')
+        return component
+      }
 
       if (!patches.inner) {
         patches.inner = afterPatch(
@@ -71,23 +119,22 @@ const contextMenuPatch = (LibraryContextMenu: any) => {
                 (x: any) => x?.key === 'game-theme-music-change-music'
               )
               if (gtmIdx != -1) nextProps.children.splice(gtmIdx, 1)
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            } catch (e) {
+            } catch {
               return component
             }
 
             if (shouldUpdate === true) {
               let updatedAppid: number = appid
-              // find the first menu component that has the correct appid assigned to _owner
-              const parentOverview = nextProps.children.find(
-                (x: any) =>
-                  x?._owner?.pendingProps?.overview?.appid &&
-                  x._owner.pendingProps.overview.appid !== appid
-              )
-              // if found then use that appid
-              if (parentOverview) {
-                updatedAppid = parentOverview._owner.pendingProps.overview.appid
+              
+              // Try to find updated appid from children using safe extraction
+              for (const child of nextProps.children || []) {
+                const childAppId = extractAppId(child)
+                if (childAppId !== null && childAppId !== appid) {
+                  updatedAppid = childAppId
+                  break
+                }
               }
+              
               spliceChangeMusic(nextProps.children, updatedAppid)
             }
 
