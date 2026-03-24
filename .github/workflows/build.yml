@@ -48,7 +48,7 @@ jobs:
         [ -d "assets" ] && cp -r assets "./DeckTunes/" || true
         [ -d "defaults" ] && cp -r defaults "./DeckTunes/" || true
         mkdir -p out
-        cd DeckTunes && zip -r ../out/DeckTunes.zip . && cd ..
+        zip -r out/DeckTunes.zip DeckTunes
       
     - name: Upload artifact
       uses: actions/upload-artifact@v4
