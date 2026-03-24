@@ -31,21 +31,25 @@ export default function GameSettings() {
   useEffect(() => {
     async function getData() {
       setLoading(true)
-      const resolver = getResolver(settings.useYtDlp)
-      const cache = await getCache(parseInt(appid))
-      if (typeof cache?.volume === 'number' && isFinite(cache.volume)) {
-        setThemeVolume(cache.volume)
-      } else {
-        setThemeVolume(settings.volume)
-      }
-      if (cache?.videoId?.length) {
-        const newAudio = await resolver.getAudioUrlFromVideo({
-          id: cache?.videoId
-        })
-        setCurrentAudio(newAudio)
-      } else {
-        const newAudio = await resolver.getAudio(appName as string)
-        setCurrentAudio(newAudio?.audioUrl)
+      try {
+        const resolver = getResolver(settings.useYtDlp)
+        const cache = await getCache(parseInt(appid))
+        if (typeof cache?.volume === 'number' && isFinite(cache.volume)) {
+          setThemeVolume(cache.volume)
+        } else {
+          setThemeVolume(settings.volume)
+        }
+        if (cache?.videoId?.length) {
+          const newAudio = await resolver.getAudioUrlFromVideo({
+            id: cache?.videoId
+          })
+          setCurrentAudio(newAudio)
+        } else {
+          const newAudio = await resolver.getAudio(appName as string)
+          setCurrentAudio(newAudio?.audioUrl)
+        }
+      } catch (e) {
+        console.error('Error loading game audio:', e)
       }
       setLoading(false)
     }

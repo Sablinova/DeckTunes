@@ -28,13 +28,17 @@ export default function ChangeTheme() {
     async function getData() {
       setLoadingNum((x) => x + 1)
       setVideos([])
-      const resolver = getResolver(settings.useYtDlp)
-      const res = resolver.getYouTubeSearchResults(searchTerm)
-      for await (const video of res) {
-        if (ignore) {
-          break
+      try {
+        const resolver = getResolver(settings.useYtDlp)
+        const res = resolver.getYouTubeSearchResults(searchTerm)
+        for await (const video of res) {
+          if (ignore) {
+            break
+          }
+          setVideos((oldVideos) => [...oldVideos, { isPlaying: false, ...video }])
         }
-        setVideos((oldVideos) => [...oldVideos, { isPlaying: false, ...video }])
+      } catch (e) {
+        console.error('Error fetching YouTube results:', e)
       }
       setLoadingNum((x) => x - 1)
     }
