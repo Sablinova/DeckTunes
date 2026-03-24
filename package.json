@@ -34,6 +34,7 @@
       "sha256hash": "3bda0968a01cde70d26720653003b28553c71be14dcb2e5f4c24e9921fdad745"
     }
   ],
+  "remote_binary_bundling": true,
   "devDependencies": {
     "@decky/rollup": "^1.0.1",
     "@decky/ui": "^4.8.2",
