@@ -33,10 +33,9 @@ jobs:
     - name: Build Decky Plugin
       run: |
         ./cli/decky plugin build .
-        unzip "out/DeckTunes.zip" -d "out/DeckTunes"
       
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: DeckTunes-build
-        path: out/DeckTunes/*
+        path: out/DeckTunes.zip
