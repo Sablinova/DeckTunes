@@ -1,6 +1,6 @@
-import { ButtonItem, PanelSection, PanelSectionRow } from '@decky/ui'
+import { ButtonItem, Field, PanelSection, PanelSectionRow } from '@decky/ui'
 import { call, toaster } from '@decky/api'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FaSync, FaDownload, FaCheck } from 'react-icons/fa'
 
 type UpdateCheckResponse = {
@@ -20,7 +20,7 @@ type UpdatePerformResponse = {
 }
 
 export default function YtdlpUpdateSection() {
-  const [checking, setChecking] = useState(false)
+  const [checking, setChecking] = useState(true) // Start true for initial load
   const [updating, setUpdating] = useState(false)
   const [updateInfo, setUpdateInfo] = useState<{
     current_version?: string
@@ -28,28 +28,36 @@ export default function YtdlpUpdateSection() {
     update_available?: boolean
   } | null>(null)
 
-  async function checkForUpdates() {
+  // Check for updates on component mount
+  useEffect(() => {
+    checkForUpdates(true)
+  }, [])
+
+  async function checkForUpdates(silent = false) {
     setChecking(true)
     try {
       const result = await call<[], UpdateCheckResponse>('check_ytdlp_update')
       if (result.success) {
         setUpdateInfo(result)
-        if (result.update_available) {
-          toaster.toast({
-            title: 'yt-dlp Update Available',
-            body: `Current: ${result.current_version} → Latest: ${result.latest_version}`,
-            icon: <FaDownload />,
-            duration: 3000
-          })
-        } else {
-          toaster.toast({
-            title: 'yt-dlp Up to Date',
-            body: `Version ${result.current_version}`,
-            icon: <FaCheck />,
-            duration: 2000
-          })
+        // Only show toasts for manual checks, not on load
+        if (!silent) {
+          if (result.update_available) {
+            toaster.toast({
+              title: 'yt-dlp Update Available',
+              body: `Current: ${result.current_version} → Latest: ${result.latest_version}`,
+              icon: <FaDownload />,
+              duration: 3000
+            })
+          } else {
+            toaster.toast({
+              title: 'yt-dlp Up to Date',
+              body: `Version ${result.current_version}`,
+              icon: <FaCheck />,
+              duration: 2000
+            })
+          }
         }
-      } else {
+      } else if (!silent) {
         toaster.toast({
           title: 'Update Check Failed',
           body: result.error || 'Unknown error',
@@ -59,12 +67,14 @@ export default function YtdlpUpdateSection() {
       }
     } catch (e) {
       console.error('Update check error:', e)
-      toaster.toast({
-        title: 'Update Check Failed',
-        body: String(e),
-        icon: <FaSync />,
-        duration: 3000
-      })
+      if (!silent) {
+        toaster.toast({
+          title: 'Update Check Failed',
+          body: String(e),
+          icon: <FaSync />,
+          duration: 3000
+        })
+      }
     }
     setChecking(false)
   }
@@ -103,39 +113,51 @@ export default function YtdlpUpdateSection() {
   }
 
   return (
-    <PanelSection title="yt-dlp Updates">
-      <PanelSectionRow>
-        <ButtonItem
-          label={
-            updateInfo
-              ? `Current: ${updateInfo.current_version || 'Unknown'}`
-              : 'Check for yt-dlp updates'
-          }
-          description={
-            updateInfo && updateInfo.update_available
-              ? `Update available: ${updateInfo.latest_version}`
-              : updateInfo
-                ? 'yt-dlp is up to date'
-                : 'Manually check for the latest yt-dlp version'
-          }
-          layout="below"
-          onClick={checkForUpdates}
-          disabled={checking || updating}
-        >
-          {checking ? 'Checking...' : 'Check for Updates'}
-        </ButtonItem>
-      </PanelSectionRow>
-      {updateInfo && updateInfo.update_available && (
+    <PanelSection title="yt-dlp">
+      {checking && !updateInfo ? (
+        <PanelSectionRow>
+          <Field label="Checking for updates..." />
+        </PanelSectionRow>
+      ) : updateInfo ? (
+        <>
+          <PanelSectionRow>
+            <Field
+              label="Current Version"
+              bottomSeparator="none"
+            >
+              {updateInfo.current_version || 'Unknown'}
+            </Field>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <Field
+              label="Latest Version"
+              bottomSeparator={updateInfo.update_available ? 'standard' : 'none'}
+            >
+              {updateInfo.latest_version || 'Unknown'}
+            </Field>
+          </PanelSectionRow>
+          {updateInfo.update_available && (
+            <PanelSectionRow>
+              <ButtonItem
+                layout="below"
+                onClick={performUpdate}
+                disabled={updating || checking}
+                bottomSeparator="none"
+              >
+                {updating ? 'Updating...' : 'Update yt-dlp'}
+              </ButtonItem>
+            </PanelSectionRow>
+          )}
+        </>
+      ) : (
         <PanelSectionRow>
           <ButtonItem
-            label={`Update to ${updateInfo.latest_version}`}
-            description="Download and install the latest version"
             layout="below"
-            onClick={performUpdate}
-            disabled={updating || checking}
+            onClick={() => checkForUpdates(false)}
+            disabled={checking}
             bottomSeparator="none"
           >
-            {updating ? 'Updating...' : 'Update Now'}
+            Check for Updates
           </ButtonItem>
         </PanelSectionRow>
       )}

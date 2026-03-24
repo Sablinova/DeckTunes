@@ -17,6 +17,9 @@
 
 ## 🆕 What's New in DeckTunes
 
+### v1.8.7
+- ✅ **Improved yt-dlp settings UI** - Shows current/latest versions automatically, update button only when needed
+
 ### v1.8.6
 - ✅ **yt-dlp update notification on load** - Get notified when an update is available
 - ✅ **Fixed context menu crash** on Oct 2025+ Steam client updates
@@ -32,17 +35,17 @@
 
 ## 📦 Installation
 
-### Via Decky Loader Plugin Store (Coming Soon)
-1. Open Decky Loader on your Steam Deck
-2. Go to the Plugin Store
+### Via Decky Loader Plugin Store
+1. Open Decky Loader on your Steam Deck (... button → Decky icon)
+2. Go to the Plugin Store (shopping bag icon)
 3. Search for "DeckTunes"
 4. Click Install
 
-### Manual Installation (For Now)
-1. Download the latest release from [Releases](https://github.com/Sablinova/DeckTunes/releases)
-2. Extract the archive
-3. Copy the `DeckTunes` folder to `~/homebrew/plugins/`
-4. Restart Steam or reload Decky Loader
+### Manual Installation
+1. Download `DeckTunes.zip` from the latest [Release](https://github.com/Sablinova/DeckTunes/releases)
+2. Open Decky Loader settings (... button → Decky icon → Settings)
+3. Select "Install Plugin From Zip"
+4. Choose the downloaded `DeckTunes.zip` file
 
 ### Requirements
 
@@ -69,10 +72,10 @@
 - **Volume** - Adjust theme music volume (0-100%)
 - **Auto-play** - Automatically play themes when viewing games
 
-### yt-dlp Updates
+### yt-dlp
 - **Current Version** - Shows installed yt-dlp version
 - **Latest Version** - Shows latest available version
-- **Update Button** - Manually update yt-dlp
+- **Update Button** - Appears when an update is available
 
 ## 🤝 Compatibility
 
@@ -95,7 +98,7 @@
 - Verify no other audio plugins are conflicting
 
 ### Settings not saving
-- Ensure the plugin has write permissions to `~/.local/share/decky/plugins/DeckTunes/`
+- Ensure the plugin has write permissions to `~/homebrew/plugins/DeckTunes/`
 - Try restarting Steam
 - Check Decky Loader logs for permission errors
 
@@ -127,7 +130,7 @@ All improvements made here are offered back to the community with gratitude for 
 
 ## 🌍 Localisation
 
-Localisation support is inherited from the original plugin via [Crowdin](https://crowdin.com/project/sdh-gamethememusic). 
+Localisation support is inherited from the original plugin. 
 
 Current translations include: Bulgarian, Chinese (Simplified & Traditional), Czech, Danish, Dutch, Finnish, French, German, Greek, Hungarian, Italian, Japanese, Korean, Norwegian, Polish, Portuguese (EU & Brazilian), Romanian, Russian, Spanish (EU & Latin America), Swedish, Thai, Turkish, Ukrainian, and Vietnamese.
 

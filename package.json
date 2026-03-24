@@ -1,6 +1,6 @@
 {
   "name": "decktunes",
-  "version": "1.8.6",
+  "version": "1.8.7",
   "description": "Automatic game theme music for Steam Deck",
   "type": "module",
   "scripts": {
