@@ -29,15 +29,26 @@ jobs:
     - name: Build plugin
       run: pnpm run build
 
-    - name: Download Decky Plugin CLI
+    - name: Download yt-dlp binary
       run: |
-        mkdir -p cli
-        curl -L -o cli/decky "https://github.com/SteamDeckHomebrew/cli/releases/latest/download/decky-linux-x86_64"
-        chmod +x cli/decky
+        mkdir -p bin
+        curl -L -o bin/yt-dlp "https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/yt-dlp"
+        chmod +x bin/yt-dlp
 
-    - name: Build Decky Plugin
+    - name: Package plugin
       run: |
-        ./cli/decky plugin build .
+        mkdir -p "DeckTunes"
+        cp main.py "./DeckTunes/"
+        cp plugin.json "./DeckTunes/"
+        cp package.json "./DeckTunes/"
+        cp LICENSE "./DeckTunes/"
+        cp README.md "./DeckTunes/"
+        cp -r dist "./DeckTunes/"
+        cp -r bin "./DeckTunes/"
+        [ -d "assets" ] && cp -r assets "./DeckTunes/" || true
+        [ -d "defaults" ] && cp -r defaults "./DeckTunes/" || true
+        mkdir -p out
+        cd DeckTunes && zip -r ../out/DeckTunes.zip . && cd ..
       
     - name: Upload artifact
       uses: actions/upload-artifact@v4
