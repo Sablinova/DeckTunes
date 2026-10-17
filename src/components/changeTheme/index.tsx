@@ -76,38 +76,58 @@ export default function ChangeTheme() {
     <div
       style={{
         marginTop: '40px',
-        height: 'calc(100% - 40px)'
+        height: 'calc(100% - 40px)',
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
-      <Tabs
-        autoFocusContents
-        activeTab={currentTab}
-        onShowTab={setCurrentTab}
-        tabs={[
-          {
-            title: t('changeThemeMusic'),
-            content: (
-              <ChangePage
-                videos={videos}
-                loading={loadingNum > 0}
-                searchError={searchError}
-                retrySearch={() => setSearchAttempt((attempt) => attempt + 1)}
-                handlePlay={handlePlay}
-                customSearch={setSearchTerm}
-                currentSearch={searchTerm}
-                setInitialSearch={setInitialSearch}
-              />
-            ),
-            id: 'change-music-tab'
-          },
-          {
-            title: t('gameSettings'),
-            content: <GameSettings />,
-            id: 'game-settings-tab'
-          },
-          { title: t('about'), content: <AboutPage />, id: 'about-tab' }
-        ]}
-      />
+      <header
+        style={{
+          padding: '16px 24px 8px',
+          maxWidth: '1088px',
+          width: '100%',
+          boxSizing: 'border-box',
+          margin: '0 auto'
+        }}
+      >
+        <h2 style={{ margin: '0 0 6px', fontSize: '24px', fontWeight: 600 }}>
+          {appName}
+        </h2>
+        <p style={{ margin: 0, fontSize: '14px', color: '#aab5c2' }}>
+          {t('sharedThemeDescription')}
+        </p>
+      </header>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <Tabs
+          autoFocusContents
+          activeTab={currentTab}
+          onShowTab={setCurrentTab}
+          tabs={[
+            {
+              title: t('changeThemeMusic'),
+              content: (
+                <ChangePage
+                  videos={videos}
+                  loading={loadingNum > 0}
+                  searchError={searchError}
+                  retrySearch={() => setSearchAttempt((attempt) => attempt + 1)}
+                  handlePlay={handlePlay}
+                  customSearch={setSearchTerm}
+                  currentSearch={searchTerm}
+                  setInitialSearch={setInitialSearch}
+                />
+              ),
+              id: 'change-music-tab'
+            },
+            {
+              title: t('gameSettings'),
+              content: <GameSettings />,
+              id: 'game-settings-tab'
+            },
+            { title: t('about'), content: <AboutPage />, id: 'about-tab' }
+          ]}
+        />
+      </div>
     </div>
   )
 }

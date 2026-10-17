@@ -2,8 +2,6 @@ import {
   DialogButton,
   Focusable,
   ModalRoot,
-  PanelSection,
-  PanelSectionRow,
   SteamSpinner,
   TextField,
   showModal,
@@ -40,8 +38,6 @@ export default function ChangePage({
   const t = useTranslations()
   const { settings } = useSettings()
   const { appid } = useParams<{ appid: string }>()
-  const appDetails = appStore.GetAppOverviewByGameID(parseInt(appid))
-  const appName = appDetails?.display_name?.replace(/(™|®|©)/g, '')
   const [selected, setSelected] = useState<string | undefined>()
   const [searchTerm, setSearchTerm] = useState(currentSearch)
 
@@ -77,101 +73,129 @@ export default function ChangePage({
   }
 
   return (
-    <div>
-      <h2 style={{ margin: '20px 0' }}>{appName}</h2>
-      <PanelSection>
-        <PanelSectionRow>
-          <Focusable
-            style={{
-              display: 'grid',
-              gap: '6px',
-              gridTemplateColumns: '2fr max-content max-content',
-              height: 'max-content',
-              background: 'var(--main-editor-bg-color)',
-              borderRadius: '6px',
-              padding: '10px'
-            }}
-          >
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                customSearch(searchTerm)
-              }}
-            >
-              <TextField
-                onChange={(e) => setSearchTerm(e.target.value)}
-                value={searchTerm}
-              />
-            </form>
-            <DialogButton
-              disabled={!searchTerm?.length}
-              focusable={!loading && Boolean(searchTerm?.length)}
-              onClick={() => customSearch(searchTerm)}
-            >
-              {t('search')}
-            </DialogButton>
-            <DialogButton
-              disabled={!searchTerm?.length}
-              focusable={!loading && Boolean(searchTerm?.length)}
-              onClick={() => {
-                setSearchTerm(setInitialSearch())
-              }}
-            >
-              {t('reset')}
-            </DialogButton>
-          </Focusable>
-        </PanelSectionRow>
-      </PanelSection>
+    <div
+      style={{
+        padding: '16px 24px 32px',
+        maxWidth: '1040px',
+        margin: '0 auto'
+      }}
+    >
+      <Focusable
+        style={{
+          display: 'grid',
+          gap: '12px',
+          gridTemplateColumns: 'minmax(0, 1fr) auto auto',
+          alignItems: 'center',
+          marginBottom: '20px'
+        }}
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            customSearch(searchTerm)
+          }}
+        >
+          <TextField
+            label={t('musicSearchPlaceholder')}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            value={searchTerm}
+          />
+        </form>
+        <DialogButton
+          disabled={!searchTerm.trim()}
+          onClick={() => customSearch(searchTerm)}
+          style={{ minWidth: 0 }}
+        >
+          {t('search')}
+        </DialogButton>
+        <DialogButton
+          onClick={() => setSearchTerm(setInitialSearch())}
+          style={{ minWidth: 0 }}
+        >
+          {t('reset')}
+        </DialogButton>
+      </Focusable>
+
+      <NoMusic selected={selected === ''} selectNewAudio={selectNewAudio} />
+
       {searchError && (
-        <PanelSection>
-          <PanelSectionRow>
-            <div
-              role="alert"
-              style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
-            >
-              <strong>{t('musicSearchFailed')}</strong>
-              <p>{searchError}</p>
-            </div>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <DialogButton onClick={retrySearch} disabled={loading}>
-              {t('retryMusicSearch')}
-            </DialogButton>
-          </PanelSectionRow>
-        </PanelSection>
-      )}
-      {loading && videos?.length === 0 ? (
-        <SteamSpinner />
-      ) : (
-        <>
-          <Focusable
+        <div
+          role="alert"
+          style={{
+            padding: '16px',
+            margin: '16px 0',
+            borderRadius: '8px',
+            background: 'rgba(225, 106, 106, 0.08)',
+            border: '1px solid rgba(225, 106, 106, 0.25)'
+          }}
+        >
+          <strong>{t('musicSearchFailed')}</strong>
+          <p
             style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              gap: '10px',
-              flexDirection: 'row'
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
+              fontSize: '13px',
+              maxHeight: '140px',
+              overflowY: 'auto'
             }}
           >
-            <NoMusic
-              selected={selected === ''}
+            {searchError}
+          </p>
+          <DialogButton onClick={retrySearch} disabled={loading}>
+            {t('retryMusicSearch')}
+          </DialogButton>
+        </div>
+      )}
+
+      <h3
+        style={{
+          margin: '24px 0 12px',
+          fontSize: '16px',
+          fontWeight: 500,
+          color: '#c5d0dc'
+        }}
+      >
+        {t('searchResults')}
+      </h3>
+      {loading && !videos.length ? (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+            padding: '40px 16px'
+          }}
+        >
+          <SteamSpinner style={{ width: '32px', height: '32px' }} />
+          {t('searchingMusic')}
+        </div>
+      ) : (
+        <Focusable
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '16px',
+            alignItems: 'start'
+          }}
+        >
+          {videos.map((video, index) => (
+            <AudioPlayer
+              key={video.id}
+              video={video}
+              volume={settings.volume}
+              handlePlay={(status) => handlePlay(index, status)}
+              selected={selected === video.id}
               selectNewAudio={selectNewAudio}
             />
-            {videos.map((video, index) => (
-              <AudioPlayer
-                key={video.id}
-                video={video}
-                volume={settings.volume}
-                handlePlay={(status) => {
-                  handlePlay(index, status)
-                }}
-                selected={selected === video.id}
-                selectNewAudio={selectNewAudio}
-              />
-            ))}
-            {loading && <SteamSpinner />}
-          </Focusable>
-        </>
+          ))}
+        </Focusable>
+      )}
+      {!loading && !videos.length && !searchError && (
+        <p role="status" style={{ color: '#aab5c2', padding: '24px 0' }}>
+          {t('noSearchResults')}
+        </p>
       )}
     </div>
   )

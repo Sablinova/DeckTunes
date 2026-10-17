@@ -2,6 +2,7 @@ import {
   DialogButton,
   Focusable,
   SliderField,
+  PanelSection,
   PanelSectionRow,
   useParams
 } from '@decky/ui'
@@ -19,8 +20,6 @@ export default function GameSettings() {
   const t = useTranslations()
   const { settings, isLoading: settingsIsLoading } = useSettings()
   const { appid } = useParams<{ appid: string }>()
-  const appDetails = appStore.GetAppOverviewByGameID(parseInt(appid))
-  const appName = appDetails?.display_name
 
   const { audio, isLoading: themeLoading } = useThemeMusic(parseInt(appid))
   const [themeVolume, setThemeVolume] = useState(settings.volume)
@@ -54,56 +53,52 @@ export default function GameSettings() {
     updateCache(parseInt(appid), { volume: reset ? undefined : newVol })
   }
 
-  return (
-    <div>
-      <h2 style={{ margin: '20px 0' }}>{appName}</h2>
+  useEffect(() => {
+    if (audioPlayer.isReady) audioPlayer.setVolume(themeVolume)
+  }, [audioPlayer.isReady, themeVolume])
 
-      <Focusable
-        style={{
-          background: 'var(--main-editor-bg-color)',
-          borderRadius: '6px',
-          display: 'grid',
-          gridGap: '16px',
-          gridTemplateColumns: '2fr max-content max-content',
-          height: 'max-content',
-          padding: '10px 10px 10px 16px',
-          alignItems: 'center'
-        }}
-      >
-        <div style={{ padding: '0 10px' }}>
-          <PanelSectionRow>
-            <SliderField
-              layout="below"
-              bottomSeparator="none"
-              label={t('volume')}
-              description={t('gameVolumeDescription')}
-              value={themeVolume * 100}
-              onChange={(newVal) => updateThemeVolume(newVal / 100)}
-              min={0}
-              max={100}
-              step={1}
-              icon={<FaVolumeUp />}
-              editableValue
-            />
-          </PanelSectionRow>
-        </div>
+  return (
+    <div
+      style={{ padding: '16px 24px 32px', maxWidth: '680px', margin: '0 auto' }}
+    >
+      <PanelSection title={t('gameSettings')}>
+        <PanelSectionRow>
+          <SliderField
+            layout="below"
+            bottomSeparator="none"
+            label={t('volume')}
+            description={t('gameVolumeDescription')}
+            value={themeVolume * 100}
+            onChange={(value) => updateThemeVolume(value / 100)}
+            disabled={loading}
+            min={0}
+            max={100}
+            step={1}
+            icon={<FaVolumeUp />}
+            editableValue
+          />
+        </PanelSectionRow>
+      </PanelSection>
+      <Focusable style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
         <DialogButton
           onClick={audioPlayer.togglePlay}
-          disabled={loading || themeLoading}
-          focusable={!loading && !themeLoading}
-          style={{ height: 'max-content' }}
+          disabled={
+            loading || themeLoading || !audio.audioUrl || !audioPlayer.isReady
+          }
+          style={{ flex: 1, minWidth: 0 }}
         >
           {loading || themeLoading ? (
             <Spinner />
           ) : audioPlayer.isPlaying ? (
             t('stop')
           ) : (
-            t('play')
+            t('previewMusic')
           )}
         </DialogButton>
         <DialogButton
           onClick={() => updateThemeVolume(settings.volume, true)}
-          style={{ height: 'max-content' }}
+          disabled={loading}
+          style={{ flex: 1, minWidth: 0 }}
         >
           {t('resetVolume')}
         </DialogButton>

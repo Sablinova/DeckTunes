@@ -174,7 +174,7 @@ Record the Steam client channel/version, SteamOS version, and Decky version.
 
 After installing the updated ZIP, enable the preview, close Quick Access, and
 focus a game that plays correctly on its details page. Wait several seconds, then
-open DeckTunes and choose **Home Preview Diagnostics → Show preview status**.
+open DeckTunes and choose **Tools & support → Open tools → Diagnostics → Home Preview Diagnostics**.
 The report identifies build `home-preview-window-focus-v6` and retains the last playback
 result and attempted AppID even when opening Quick Access changes current focus.
 
