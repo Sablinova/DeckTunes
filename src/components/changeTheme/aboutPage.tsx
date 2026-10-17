@@ -7,7 +7,14 @@ export default function AboutPage() {
   const t = useTranslations()
   return (
     <div
-      style={{ padding: '16px 24px 32px', maxWidth: '680px', margin: '0 auto' }}
+      style={{
+        padding: '16px 24px 32px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        maxWidth: '728px',
+        margin: '0 auto'
+      }}
     >
       <h1>{t('aboutLabel')}</h1>
       <p>{t('aboutDescription')}</p>

@@ -135,12 +135,21 @@ export default function AudioPlayer({
           {downloading ? t('applyingTheme') : t('loadingAudio')}
         </div>
       ) : (
-        <Focusable style={{ display: 'flex', gap: '8px' }}>
+        <Focusable
+          flow-children="row"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: '8px'
+          }}
+        >
           <DialogButton
             onClick={togglePlay}
             disabled={!audioPlayer.isReady}
             style={{
-              flex: 1,
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
               minWidth: 0,
               padding: '10px 6px',
               fontSize: '14px'
@@ -152,7 +161,9 @@ export default function AudioPlayer({
             disabled={selected}
             onClick={selectAudio}
             style={{
-              flex: 1,
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
               minWidth: 0,
               padding: '10px 6px',
               fontSize: '14px'

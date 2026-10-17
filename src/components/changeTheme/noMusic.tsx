@@ -26,29 +26,57 @@ export default function NoMusic({
   }
   return (
     <Focusable
+      flow-children="row"
       style={{
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: '20px minmax(0, 1fr) 144px',
         alignItems: 'center',
         gap: '16px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
         padding: '14px 16px',
         borderRadius: '8px',
         background: 'rgba(255,255,255,0.03)',
         border: '1px solid rgba(255,255,255,0.08)'
       }}
     >
-      <FaVolumeMute style={{ color: '#aab5c2', flexShrink: 0 }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <strong style={{ fontSize: '14px', fontWeight: 500 }}>
+      <FaVolumeMute style={{ color: '#aab5c2', width: '18px' }} />
+      <div style={{ minWidth: 0 }}>
+        <strong
+          style={{
+            display: 'block',
+            fontSize: '14px',
+            fontWeight: 500,
+            lineHeight: '20px'
+          }}
+        >
           {t('noMusicLabel')}
         </strong>
-        <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#aab5c2' }}>
+        <p
+          style={{
+            margin: '4px 0 0',
+            fontSize: '13px',
+            lineHeight: '18px',
+            color: '#aab5c2',
+            whiteSpace: 'normal',
+            wordBreak: 'normal'
+          }}
+        >
           {t('noMusicDescription')}
         </p>
       </div>
       <DialogButton
         disabled={selected || applying}
         onClick={apply}
-        style={{ minWidth: '96px' }}
+        style={{
+          width: '100%',
+          minWidth: 0,
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          padding: '10px 12px',
+          fontSize: '14px'
+        }}
       >
         {selected ? (
           <span

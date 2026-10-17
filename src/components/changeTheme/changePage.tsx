@@ -76,20 +76,25 @@ export default function ChangePage({
     <div
       style={{
         padding: '16px 24px 32px',
-        maxWidth: '1040px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        maxWidth: '1088px',
         margin: '0 auto'
       }}
     >
       <Focusable
+        flow-children="row"
         style={{
           display: 'grid',
           gap: '12px',
-          gridTemplateColumns: 'minmax(0, 1fr) auto auto',
-          alignItems: 'center',
+          gridTemplateColumns: 'minmax(0, 1fr) 112px 96px',
+          alignItems: 'end',
           marginBottom: '20px'
         }}
       >
         <form
+          style={{ minWidth: 0, margin: 0 }}
           onSubmit={(event) => {
             event.preventDefault()
             customSearch(searchTerm)
@@ -104,13 +109,23 @@ export default function ChangePage({
         <DialogButton
           disabled={!searchTerm.trim()}
           onClick={() => customSearch(searchTerm)}
-          style={{ minWidth: 0 }}
+          style={{
+            width: '100%',
+            minWidth: 0,
+            maxWidth: '100%',
+            boxSizing: 'border-box'
+          }}
         >
           {t('search')}
         </DialogButton>
         <DialogButton
           onClick={() => setSearchTerm(setInitialSearch())}
-          style={{ minWidth: 0 }}
+          style={{
+            width: '100%',
+            minWidth: 0,
+            maxWidth: '100%',
+            boxSizing: 'border-box'
+          }}
         >
           {t('reset')}
         </DialogButton>

@@ -78,7 +78,12 @@ export default function ChangeTheme() {
         marginTop: '40px',
         height: 'calc(100% - 40px)',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        overflowX: 'clip'
       }}
     >
       <header
@@ -87,6 +92,7 @@ export default function ChangeTheme() {
           maxWidth: '1088px',
           width: '100%',
           boxSizing: 'border-box',
+          flexShrink: 0,
           margin: '0 auto'
         }}
       >
@@ -97,9 +103,19 @@ export default function ChangeTheme() {
           {t('sharedThemeDescription')}
         </p>
       </header>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          width: '100%',
+          overflowX: 'clip'
+        }}
+      >
         <Tabs
-          autoFocusContents
+          // Enter content with D-pad Down, rather than focusing a panel while
+          // Steam is still switching it into view and scrolling the route sideways.
+          autoFocusContents={false}
           activeTab={currentTab}
           onShowTab={setCurrentTab}
           tabs={[

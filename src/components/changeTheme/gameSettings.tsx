@@ -59,7 +59,14 @@ export default function GameSettings() {
 
   return (
     <div
-      style={{ padding: '16px 24px 32px', maxWidth: '680px', margin: '0 auto' }}
+      style={{
+        padding: '16px 24px 32px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        maxWidth: '728px',
+        margin: '0 auto'
+      }}
     >
       <PanelSection title={t('gameSettings')}>
         <PanelSectionRow>
@@ -79,13 +86,26 @@ export default function GameSettings() {
           />
         </PanelSectionRow>
       </PanelSection>
-      <Focusable style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+      <Focusable
+        flow-children="row"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: '12px',
+          marginTop: '16px'
+        }}
+      >
         <DialogButton
           onClick={audioPlayer.togglePlay}
           disabled={
             loading || themeLoading || !audio.audioUrl || !audioPlayer.isReady
           }
-          style={{ flex: 1, minWidth: 0 }}
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box'
+          }}
         >
           {loading || themeLoading ? (
             <Spinner />
@@ -98,7 +118,12 @@ export default function GameSettings() {
         <DialogButton
           onClick={() => updateThemeVolume(settings.volume, true)}
           disabled={loading}
-          style={{ flex: 1, minWidth: 0 }}
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box'
+          }}
         >
           {t('resetVolume')}
         </DialogButton>
