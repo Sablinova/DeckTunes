@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import type { HomeFocusInspection } from './homeFocus'
 
 let snapshot = {
-  build: 'home-preview-shared-theme-v5',
+  build: 'home-preview-window-focus-v6',
   runtime: 'Not started',
   playback: 'No preview attempt yet',
   lastResult: '',

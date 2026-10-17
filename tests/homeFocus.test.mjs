@@ -241,3 +241,143 @@ test('live navigation focus remains usable during a Home document handoff before
   }
   assert.equal(getFocusedHomeAppId(stale), 730)
 })
+
+for (const staleRoute of ['/login', '/index.html']) {
+  test(`a visible ${staleRoute} node cannot mask another controller's live Home card`, () => {
+    const doc = document([])
+    const staleDocument = document([], staleRoute)
+    const staleHost = {
+      FocusNavController: {
+        m_ActiveContext: {
+          m_lastFocusNode: {
+            m_element: { ...card('570'), ownerDocument: staleDocument }
+          }
+        }
+      }
+    }
+    doc.defaultView.FocusNavController = {
+      m_ActiveContext: {
+        m_lastFocusNode: { m_element: { ...card('730'), ownerDocument: doc } }
+      }
+    }
+    const result = inspectHomeFocus(doc, [staleHost, doc.defaultView])
+    assert.equal(result.appId, 730)
+    assert.equal(result.focusDocumentRoute, '/library/home')
+    assert.match(
+      result.ignoredNavigationNodes[0],
+      /Unrelated navigation document/
+    )
+  })
+}
+
+test('a login context does not mask the live Home tree in the same controller', () => {
+  const doc = document([])
+  const login = document([], '/login')
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: { m_element: { ...card('570'), ownerDocument: login } },
+      m_LastActiveNavTree: {
+        m_ID: 'GamepadUI_Full_Root',
+        m_lastFocusNode: { m_element: { ...card('730'), ownerDocument: doc } }
+      }
+    }
+  }
+  assert.equal(inspectHomeFocus(doc).appId, 730)
+})
+
+test('Home routing can identify a card rendered in the main tree index.html shell', () => {
+  const doc = document([])
+  const shell = document([], '/index.html')
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: {
+      m_LastActiveNavTree: {
+        m_ID: 'GamepadUI_Full_Root',
+        m_lastFocusNode: { m_element: { ...card('730'), ownerDocument: shell } }
+      }
+    }
+  }
+  const result = inspectHomeFocus(doc)
+  assert.equal(result.appId, 730)
+  assert.equal(result.focusDocumentRoute, '/index.html')
+  assert.equal(result.focusTreeId, 'GamepadUI_Full_Root')
+  doc.defaultView.location.pathname = '/library/app/730'
+  assert.equal(
+    inspectHomeFocus(doc).appId,
+    null,
+    'a shell cannot override leaving Home'
+  )
+})
+
+test('a foreign bootstrap node falls through to the live Home gpfocus fallback', () => {
+  const doc = document([card('730')])
+  const shell = document([], '/index.html')
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: { m_element: { ...card('570'), ownerDocument: shell } }
+    }
+  }
+  const result = inspectHomeFocus(doc)
+  assert.equal(result.appId, 730)
+  assert.equal(result.focusSource, 'gpfocus')
+})
+
+test('an index.html overlay owning real DOM focus blocks stale Home cards', () => {
+  const doc = document([card('730')])
+  const overlay = document([], '/index.html')
+  overlay.hasFocus = () => true
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: {
+        m_element: { ...focusedNode(), ownerDocument: overlay }
+      }
+    }
+  }
+  assert.equal(inspectHomeFocus(doc).appId, null)
+})
+
+test('Steam focused-window ownership blocks QAM but permits the actual Home shell', () => {
+  const doc = document([])
+  const shell = document([], '/index.html')
+  const overlay = document([], '/index.html')
+  shell.defaultView.document = shell
+  overlay.defaultView.document = overlay
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: {
+      m_LastActiveNavTree: {
+        m_ID: 'GamepadUI_Full_Root',
+        m_lastFocusNode: { m_element: { ...card('730'), ownerDocument: shell } }
+      }
+    }
+  }
+  let focused = overlay.defaultView
+  doc.defaultView.SteamUIStore = {
+    GetFocusedWindowInstance: () => ({ BrowserWindow: focused })
+  }
+  const blocked = inspectHomeFocus(doc)
+  assert.equal(blocked.appId, null)
+  assert.equal(blocked.reason, 'Another Steam window owns input focus')
+  focused = shell.defaultView
+  assert.equal(inspectHomeFocus(doc).appId, 730)
+})
+
+test('a remembered main-tree root yields to its live focused card', () => {
+  const doc = document([])
+  const shell = document([], '/index.html')
+  const leaf = { ...card('730'), ownerDocument: shell }
+  const root = {
+    ...focusedNode(),
+    ownerDocument: shell,
+    contains: (node) => node === leaf
+  }
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: { m_element: root },
+      m_LastActiveNavTree: {
+        m_ID: 'GamepadUI_Full_Root',
+        m_Root: { m_element: root },
+        m_lastFocusNode: { m_element: leaf }
+      }
+    }
+  }
+  assert.equal(inspectHomeFocus(doc).appId, 730)
+})

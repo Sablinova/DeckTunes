@@ -50,7 +50,11 @@ export function findSteamHomeWindow(
   // to another renderer. The active navigation node is the authority for which
   // Home document actually owns focus. Never override a non-Home main route.
   const focusHosts = [current, ...windows.filter((win) => win !== current)]
-  const focusedDocument = navigationFocus(focusHosts)?.ownerDocument
+  const focusedDocument = navigationFocus(
+    focusHosts,
+    undefined,
+    host?.document
+  )?.ownerDocument
   const onHome = (win?: Window | null) =>
     /^\/library\/home\/?$/i.test(steamRoute(win))
   if (

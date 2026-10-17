@@ -513,3 +513,66 @@ test('details discovery cannot overwrite or play a manual choice made while sear
   assert.equal(detail.volume, 0.3)
   assert.deepEqual(f.data.writes, [])
 })
+
+test('Home preview reaches playback when stale login focus precedes an index.html Home tree', async (t) => {
+  const f = fixture(t)
+  f.doc.querySelectorAll = () => []
+  const shell = new EventTarget()
+  shell.location = { pathname: '/index.html' }
+  shell.getComputedStyle = () => ({})
+  shell.document = { defaultView: shell }
+  const login = {
+    defaultView: {
+      location: { pathname: '/login' },
+      getComputedStyle: () => ({})
+    }
+  }
+  const focused = { ...f.card, ownerDocument: shell.document }
+  f.win.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: {
+        m_element: { ownerDocument: login, getClientRects: () => [{}] }
+      },
+      m_LastActiveNavTree: {
+        m_ID: 'GamepadUI_Full_Root',
+        m_lastFocusNode: { m_element: focused }
+      }
+    }
+  }
+  f.reconcile()
+  await f.clock.tick(500)
+  assert.equal(f.data.audios[0].src, 'http://localhost/audio/cached-theme')
+  assert.equal(f.data.diagnostics.lastAppId, 570)
+  assert.equal(f.data.diagnostics.focus.focusDocumentRoute, '/index.html')
+  assert.equal(f.data.diagnostics.focus.focusTreeId, 'GamepadUI_Full_Root')
+  f.setFocusedId(730)
+  f.reconcile()
+  assert.equal(f.data.audios[0].paused, true)
+  await f.clock.tick(500)
+  assert.equal(f.data.audios[1].src, 'stream:Counter-Strike')
+  f.win.location.pathname = '/library/app/730'
+  f.reconcile()
+  assert.equal(f.data.audios[1].paused, true)
+})
+
+test('opening an index.html QAM window stops Home and closing it starts a fresh debounce', async (t) => {
+  const f = fixture(t)
+  await f.clock.tick(500)
+  const qam = { location: { pathname: '/index.html' }, document: {} }
+  let focused = qam
+  f.win.SteamUIStore = {
+    GetFocusedWindowInstance: () => ({ BrowserWindow: focused })
+  }
+  f.reconcile()
+  assert.equal(f.data.audios[0].paused, true)
+  assert.equal(
+    f.data.diagnostics.focus.reason,
+    'Another Steam window owns input focus'
+  )
+  focused = f.win
+  f.reconcile()
+  await f.clock.tick(499)
+  assert.equal(f.data.audios.length, 1)
+  await f.clock.tick(1)
+  assert.equal(f.data.audios.length, 2)
+})

@@ -4,6 +4,7 @@ type NavNode = {
   Element?: Element
   m_pElement?: Element
   element?: Element
+  m_Tree?: NavTree
 }
 type NavTree = {
   m_ID?: string
@@ -29,6 +30,7 @@ export type SteamFocusWindow = Window & {
   GamepadNavTree?: { m_context?: { m_controller?: NavController } }
   SteamUIStore?: {
     NavigationManager?: NavController
+    GetFocusedWindowInstance?: () => { BrowserWindow?: Window } | undefined
     WindowStore?: {
       GamepadUIMainWindowInstance?: { BrowserWindow?: Window }
       SteamUIWindows?: { BrowserWindow?: Window }[]
@@ -43,6 +45,8 @@ export type HomeFocusInspection = {
   appIdSource?: string
   focusDocumentRoute?: string
   ignoredNavigationNodes?: string[]
+  focusTreeId?: string
+  focusNode?: string
 }
 
 export function steamRoute(win: Window | null | undefined): string {
@@ -101,22 +105,63 @@ export function navigationDocuments(win: Window): Document[] {
   }
   return documents
 }
-export function navigationFocus(
+type NavigationFocus = { element: Element; tree?: NavTree }
+
+function isHomeRenderer(doc: Document, tree?: NavTree): boolean {
+  const route = steamRoute(doc.defaultView)
+  return (
+    /^\/library\/home\/?$/i.test(route) ||
+    (/^\/(?:index\.html)?$/i.test(route) &&
+      tree?.m_ID === 'GamepadUI_Full_Root')
+  )
+}
+
+function navigationFocusCandidate(
   hosts: Window[],
-  ignored?: string[]
-): Element | undefined {
-  const usable = (element: Element | undefined) => {
+  ignored?: string[],
+  homeDocument?: Document
+): NavigationFocus | undefined {
+  const usable = (element: Element | undefined, tree?: NavTree) => {
     if (!element) return false
-    if (visibleElement(element)) return true
-    if (ignored && ignored.length < 4)
+    if (!visibleElement(element)) {
+      if (ignored && ignored.length < 6)
+        ignored.push(
+          `${element.isConnected === false ? 'Disconnected' : 'Hidden or empty-layout'} node in ${steamRoute(element.ownerDocument?.defaultView) || 'unknown document'}`
+        )
+      return false
+    }
+    const owner = element.ownerDocument
+    const route = steamRoute(owner?.defaultView)
+    // Steam retains visible nodes in bootstrap/login renderers. They must not
+    // prevent checking other controllers, tree focus, or the Home DOM fallback.
+    // A Full_Root tree can render Home in an index.html shell while the router
+    // reports /library/home in a different document.
+    if (
+      !homeDocument ||
+      !owner ||
+      owner === homeDocument ||
+      isHomeRenderer(owner, tree)
+    )
+      return true
+    // Explicit overlay focus still blocks remembered Home cards.
+    if (
+      owner.hasFocus?.() ||
+      /^\/(?:quickaccess|mainmenu|overlay|keyboard)(?:\/|$)/i.test(route)
+    )
+      return true
+    if (ignored && ignored.length < 6)
       ignored.push(
-        `${element.isConnected === false ? 'Disconnected' : 'Hidden or empty-layout'} node in ${steamRoute(element.ownerDocument?.defaultView) || 'unknown document'}`
+        `Unrelated navigation document ${route || '(unknown route)'}; tree ${tree?.m_ID ?? '(none)'}`
       )
     return false
   }
   for (const host of hosts) {
     for (const controller of controllers(host)) {
       for (const context of contexts(controller)) {
+        const trees = [
+          context.m_LastActiveNavTree,
+          ...(context.m_rgGamepadNavigationTrees ?? [])
+        ].filter((tree): tree is NavTree => !!tree)
         // Active QAM/modal focus takes precedence over a stale remembered Home card.
         for (const node of [
           context.ActiveElementNavNode,
@@ -124,18 +169,59 @@ export function navigationFocus(
           context.m_LastFocusNode
         ]) {
           const direct = elementOf(node)
-          if (usable(direct)) return direct
+          const tree =
+            node?.m_Tree ??
+            trees.find((candidate) => {
+              const root = elementOf(
+                candidate.Root ?? candidate.m_Root ?? candidate.m_root
+              )
+              return !!direct && (root === direct || root?.contains?.(direct))
+            })
+          if (direct && usable(direct, tree)) {
+            const root = elementOf(tree?.Root ?? tree?.m_Root ?? tree?.m_root)
+            const leaf = elementOf(
+              tree?.m_lastFocusNode ?? tree?.m_LastFocusNode
+            )
+            if (
+              direct === root &&
+              leaf &&
+              leaf !== root &&
+              root?.contains?.(leaf) &&
+              usable(leaf, tree)
+            )
+              return { element: leaf, tree }
+            return { element: direct, tree }
+          }
         }
-        for (const tree of [
-          context.m_LastActiveNavTree,
-          ...(context.m_rgGamepadNavigationTrees ?? [])
-        ]) {
+        for (const tree of trees) {
           const focused = elementOf(
             tree?.m_lastFocusNode ?? tree?.m_LastFocusNode
           )
-          if (usable(focused)) return focused
+          if (focused && usable(focused, tree))
+            return { element: focused, tree }
         }
       }
+    }
+  }
+  return undefined
+}
+export function navigationFocus(
+  hosts: Window[],
+  ignored?: string[],
+  homeDocument?: Document
+): Element | undefined {
+  return navigationFocusCandidate(hosts, ignored, homeDocument)?.element
+}
+
+function focusedSteamWindow(hosts: Window[]): Window | undefined {
+  for (const host of hosts) {
+    try {
+      const focused = (
+        host as SteamFocusWindow
+      ).SteamUIStore?.GetFocusedWindowInstance?.()?.BrowserWindow
+      if (focused?.document && !focused.document.hidden) return focused
+    } catch {
+      // A closing window cannot own usable focus.
     }
   }
   return undefined
@@ -217,11 +303,36 @@ export function inspectHomeFocus(
     return { ...result, reason: 'Not on the Home screen' }
   if (doc.hidden) return { ...result, reason: 'Steam window is hidden' }
   const ignoredNavigationNodes: string[] = []
-  const navFocus = navigationFocus(hosts, ignoredNavigationNodes)
+  const navigation = navigationFocusCandidate(
+    hosts,
+    ignoredNavigationNodes,
+    doc
+  )
+  const navFocus = navigation?.element
   if (ignoredNavigationNodes.length)
     result.ignoredNavigationNodes = ignoredNavigationNodes
   if (navFocus?.ownerDocument)
     result.focusDocumentRoute = steamRoute(navFocus.ownerDocument.defaultView)
+  if (navigation?.tree?.m_ID) result.focusTreeId = navigation.tree.m_ID
+  if (navFocus)
+    result.focusNode = `${navFocus.tagName ?? ''}.${String(navFocus.className ?? '').slice(0, 160)}`
+  const focusedWindow = focusedSteamWindow(hosts)
+  if (
+    focusedWindow &&
+    focusedWindow.document !== doc &&
+    !isHomeRenderer(
+      focusedWindow.document,
+      focusedWindow.document === navFocus?.ownerDocument
+        ? navigation?.tree
+        : undefined
+    )
+  )
+    return {
+      ...result,
+      reason: 'Another Steam window owns input focus',
+      focusSource: 'Steam focused window',
+      focusDocumentRoute: steamRoute(focusedWindow)
+    }
   const gamepadFocus = Array.from(doc.querySelectorAll('.gpfocus'))
   const candidates = navFocus
     ? [navFocus]
@@ -238,8 +349,7 @@ export function inspectHomeFocus(
     const focusedDocument = focused.ownerDocument ?? doc
     if (
       focusedDocument !== doc &&
-      (!navFocus ||
-        !/^\/library\/home\/?$/i.test(steamRoute(focusedDocument.defaultView)))
+      (!navFocus || !isHomeRenderer(focusedDocument, navigation?.tree))
     ) {
       result.reason = 'Navigation focus belongs to a different Steam document'
       continue

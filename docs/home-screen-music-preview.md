@@ -67,7 +67,14 @@ window store, or navigation-tree root documents, with Decky's legacy `findSP()`
 as a fallback. If the router retains an older Home document, a live Home navigation
 node's actual `ownerDocument` takes priority, including during the handoff before
 the next polling tick. Hidden, disconnected, or empty-layout remembered navigation
-nodes are skipped. A non-Home main route still suppresses previews. It recognizes
+nodes are skipped. Visible remembered nodes in unrelated `/login` or bootstrap
+renderers are also skipped so other controllers, tree focus, and Home DOM focus
+can be checked. A `GamepadUI_Full_Root` tree may render the actual Home card in an
+`/index.html` shell while the routing document reports `/library/home`; its focused
+card is accepted using tree identity rather than rejecting its document URL.
+If the context remembers the tree root, use the tree's live focused descendant.
+A non-Home main route still suppresses previews. Steam's focused-window API and
+actual foreign-document focus suppress previews while Quick Access owns input. It recognizes
 both `/library/home` and `/routes/library/home`,
 including hash routes. Active navigation-context focus takes priority over DOM
 classes, including while Quick Access or a modal owns focus. `gpfocus` and actual
@@ -168,7 +175,7 @@ Record the Steam client channel/version, SteamOS version, and Decky version.
 After installing the updated ZIP, enable the preview, close Quick Access, and
 focus a game that plays correctly on its details page. Wait several seconds, then
 open DeckTunes and choose **Home Preview Diagnostics → Show preview status**.
-The report identifies build `home-preview-shared-theme-v5` and retains the last playback
+The report identifies build `home-preview-window-focus-v6` and retains the last playback
 result and attempted AppID even when opening Quick Access changes current focus.
 
 - `runtime: Not started`: the global preview component has not mounted.
@@ -176,9 +183,13 @@ result and attempted AppID even when opening Quick Access changes current focus.
 - `Not on the Home screen`: check the recorded route.
 - `Focused control has no game AppID`: focus exists, but card identification failed.
 - `ignoredNavigationNodes`: remembered nodes were disconnected or had no visible
-  layout. Live DOM/gamepad focus remains eligible as a fallback.
-- `Navigation focus belongs to a different Steam document`: input is in another
-  window that is not a live Home renderer, such as Quick Access.
+  layout, or belonged to unrelated login/bootstrap documents. Other controllers,
+  tree focus, and live DOM/gamepad focus remain eligible as fallbacks.
+- `Navigation focus belongs to a different Steam document` / `Another Steam
+  window owns input focus`: input is in another window, such as Quick Access.
+- `focusDocumentRoute: /index.html` with `focusTreeId: GamepadUI_Full_Root`:
+  Home is rendered in Steam's shell document; this combination is accepted.
+  `focusNode` records the selected node's tag/class for further identification.
 - `Default Muted prevents theme search` / `No Music is selected`: intentional silence.
 - `search returned no playable theme` / `saved theme has no playable audio URL`:
   card detection worked; investigate the selected resolver or saved theme.
@@ -214,3 +225,11 @@ new release is available, reinstall a plugin ZIP while retaining runtime data,
 and verify the updated Current Version is retained and Check for Updates still
 works. Backend tests exercise the existing update action writing to persistent
 storage, ZIP reinstall behavior, error propagation, search isolation, and unload.
+
+For the cross-document focus regression, verify build `home-preview-window-focus-v6`.
+Close Quick Access, focus two cached native Home games with the D-pad, and wait
+several seconds on each. Confirm `lastAppId` records the selected game and audio
+switches. Reopen Quick Access and confirm audio stops, then close it and confirm
+a fresh debounce. Check that entering details and launching a game still stops
+the Home owner. The local suite simulates stale `/login` focus before a Home
+card in an `/index.html` main navigation tree; hardware confirmation is pending.

@@ -94,3 +94,28 @@ test('active Home-node ownership cannot override an authoritative details route'
   }
   assert.equal(findSteamHomeWindow(current, home, main).doc, main.document)
 })
+
+test('a stale login node cannot mask a newer Home renderer owning tree focus', () => {
+  const current = window('/index.html')
+  const login = window('/login')
+  const stale = window('/library/home')
+  const live = window('/library/home')
+  current.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: {
+        m_element: { ownerDocument: login.document, getClientRects: () => [{}] }
+      },
+      m_LastActiveNavTree: {
+        m_ID: 'GamepadUI_Full_Root',
+        m_lastFocusNode: {
+          m_element: {
+            ownerDocument: live.document,
+            getClientRects: () => [{}]
+          }
+        }
+      }
+    }
+  }
+  const located = findSteamHomeWindow(current, stale, stale)
+  assert.equal(located.doc, live.document)
+})
