@@ -57,7 +57,11 @@ Investigated Deck-Shelves at commit
 
 DeckTunes finds the Gaming Mode document through its rendered host, Steam's main
 window store, or navigation-tree root documents, with Decky's legacy `findSP()`
-as a fallback. It recognizes both `/library/home` and `/routes/library/home`,
+as a fallback. If the router retains an older Home document, a live Home navigation
+node's actual `ownerDocument` takes priority, including during the handoff before
+the next polling tick. Hidden, disconnected, or empty-layout remembered navigation
+nodes are skipped. A non-Home main route still suppresses previews. It recognizes
+both `/library/home` and `/routes/library/home`,
 including hash routes. Active navigation-context focus takes priority over DOM
 classes, including while Quick Access or a modal owns focus. `gpfocus` and actual
 DOM focus are fallbacks.
@@ -154,13 +158,17 @@ Record the Steam client channel/version, SteamOS version, and Decky version.
 After installing the updated ZIP, enable the preview, close Quick Access, and
 focus a game that plays correctly on its details page. Wait several seconds, then
 open DeckTunes and choose **Home Preview Diagnostics → Show preview status**.
-The report identifies build `home-preview-focus-v2` and retains the last playback
+The report identifies build `home-preview-focus-v3` and retains the last playback
 result and attempted AppID even when opening Quick Access changes current focus.
 
 - `runtime: Not started`: the global preview component has not mounted.
 - `Steam UI window not found`: no usable Steam window/document was found.
 - `Not on the Home screen`: check the recorded route.
 - `Focused control has no game AppID`: focus exists, but card identification failed.
+- `ignoredNavigationNodes`: remembered nodes were disconnected or had no visible
+  layout. Live DOM/gamepad focus remains eligible as a fallback.
+- `Navigation focus belongs to a different Steam document`: input is in another
+  window that is not a live Home renderer, such as Quick Access.
 - `Default Muted prevents theme search` / `No Music is selected`: intentional silence.
 - `search returned no playable theme` / `saved theme has no playable audio URL`:
   card detection worked; investigate the selected resolver or saved theme.
@@ -168,5 +176,7 @@ result and attempted AppID even when opening Quick Access changes current focus.
 
 Capture that report for further debugging. Current QAM focus can report no game;
 `lastAppId` and `lastResult` preserve what happened before the menu was opened.
+`recentFocus` also retains recent changed focus inspections, so a menu's current
+focus does not erase the observations made while selecting Home cards.
 The original cached-only build did not have this diagnostic panel. A successful
 build or local mock test does not establish on-device compatibility.

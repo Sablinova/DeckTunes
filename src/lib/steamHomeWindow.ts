@@ -1,4 +1,9 @@
-import { navigationDocuments, SteamFocusWindow, steamRoute } from './homeFocus'
+import {
+  navigationDocuments,
+  navigationFocus,
+  SteamFocusWindow,
+  steamRoute
+} from './homeFocus'
 
 export function findSteamHomeWindow(
   current: Window,
@@ -41,5 +46,24 @@ export function findSteamHomeWindow(
         steamRoute(win)
       )
     ) ?? windows.find((win) => win.document.title === 'SP')
-  return { doc: host?.document, hosts: windows }
+  // The router window can retain a Home document after Steam moves the live UI
+  // to another renderer. The active navigation node is the authority for which
+  // Home document actually owns focus. Never override a non-Home main route.
+  const focusHosts = [current, ...windows.filter((win) => win !== current)]
+  const focusedDocument = navigationFocus(focusHosts)?.ownerDocument
+  const onHome = (win?: Window | null) =>
+    /^\/library\/home\/?$/i.test(steamRoute(win))
+  if (
+    (!host || onHome(host)) &&
+    focusedDocument &&
+    onHome(focusedDocument.defaultView) &&
+    !focusedDocument.hidden
+  ) {
+    push(focusedDocument.defaultView)
+    return {
+      doc: focusedDocument,
+      hosts: [current, ...windows.filter((win) => win !== current)]
+    }
+  }
+  return { doc: host?.document, hosts: focusHosts }
 }

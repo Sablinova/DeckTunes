@@ -1,5 +1,6 @@
 type NavNode = {
   m_element?: Element
+  m_Element?: Element
   Element?: Element
   m_pElement?: Element
   element?: Element
@@ -9,6 +10,7 @@ type NavTree = {
   m_lastFocusNode?: NavNode
   m_LastFocusNode?: NavNode
   m_Root?: NavNode
+  m_root?: NavNode
   Root?: NavNode
 }
 type NavContext = {
@@ -39,6 +41,8 @@ export type HomeFocusInspection = {
   reason: string
   focusSource: string
   appIdSource?: string
+  focusDocumentRoute?: string
+  ignoredNavigationNodes?: string[]
 }
 
 export function steamRoute(win: Window | null | undefined): string {
@@ -63,31 +67,65 @@ function contexts(controller: NavController): NavContext[] {
   )
 }
 function elementOf(node?: NavNode): Element | undefined {
-  return node?.m_element ?? node?.Element ?? node?.m_pElement ?? node?.element
+  return (
+    node?.m_element ??
+    node?.m_Element ??
+    node?.Element ??
+    node?.m_pElement ??
+    node?.element
+  )
+}
+function visibleElement(element: Element): boolean {
+  if (
+    element.isConnected === false ||
+    element.ownerDocument?.hidden ||
+    !element.getClientRects().length
+  )
+    return false
+  const view = element.ownerDocument?.defaultView
+  if (!view) return true
+  const style = view.getComputedStyle(element)
+  return style.visibility !== 'hidden' && style.display !== 'none'
 }
 export function navigationDocuments(win: Window): Document[] {
   const documents: Document[] = []
   for (const controller of controllers(win)) {
     for (const context of contexts(controller)) {
       for (const tree of context.m_rgGamepadNavigationTrees ?? []) {
-        const doc = elementOf(tree.Root ?? tree.m_Root)?.ownerDocument
+        const doc = elementOf(
+          tree.Root ?? tree.m_Root ?? tree.m_root
+        )?.ownerDocument
         if (doc && !documents.includes(doc)) documents.push(doc)
       }
     }
   }
   return documents
 }
-function navigationFocus(hosts: Window[]): Element | undefined {
+export function navigationFocus(
+  hosts: Window[],
+  ignored?: string[]
+): Element | undefined {
+  const usable = (element: Element | undefined) => {
+    if (!element) return false
+    if (visibleElement(element)) return true
+    if (ignored && ignored.length < 4)
+      ignored.push(
+        `${element.isConnected === false ? 'Disconnected' : 'Hidden or empty-layout'} node in ${steamRoute(element.ownerDocument?.defaultView) || 'unknown document'}`
+      )
+    return false
+  }
   for (const host of hosts) {
     for (const controller of controllers(host)) {
       for (const context of contexts(controller)) {
         // Active QAM/modal focus takes precedence over a stale remembered Home card.
-        const direct = elementOf(
-          context.m_lastFocusNode ??
-            context.m_LastFocusNode ??
-            context.ActiveElementNavNode
-        )
-        if (direct) return direct
+        for (const node of [
+          context.ActiveElementNavNode,
+          context.m_lastFocusNode,
+          context.m_LastFocusNode
+        ]) {
+          const direct = elementOf(node)
+          if (usable(direct)) return direct
+        }
         for (const tree of [
           context.m_LastActiveNavTree,
           ...(context.m_rgGamepadNavigationTrees ?? [])
@@ -95,7 +133,7 @@ function navigationFocus(hosts: Window[]): Element | undefined {
           const focused = elementOf(
             tree?.m_lastFocusNode ?? tree?.m_LastFocusNode
           )
-          if (focused) return focused
+          if (usable(focused)) return focused
         }
       }
     }
@@ -178,7 +216,12 @@ export function inspectHomeFocus(
   if (!win || !/^\/library\/home\/?$/i.test(route))
     return { ...result, reason: 'Not on the Home screen' }
   if (doc.hidden) return { ...result, reason: 'Steam window is hidden' }
-  const navFocus = navigationFocus(hosts)
+  const ignoredNavigationNodes: string[] = []
+  const navFocus = navigationFocus(hosts, ignoredNavigationNodes)
+  if (ignoredNavigationNodes.length)
+    result.ignoredNavigationNodes = ignoredNavigationNodes
+  if (navFocus?.ownerDocument)
+    result.focusDocumentRoute = steamRoute(navFocus.ownerDocument.defaultView)
   const gamepadFocus = Array.from(doc.querySelectorAll('.gpfocus'))
   const candidates = navFocus
     ? [navFocus]
@@ -191,11 +234,25 @@ export function inspectHomeFocus(
       ? 'gpfocus'
       : 'DOM focus'
   for (const focused of candidates) {
-    if (!focused || (focused.ownerDocument && focused.ownerDocument !== doc))
+    if (!focused) continue
+    const focusedDocument = focused.ownerDocument ?? doc
+    if (
+      focusedDocument !== doc &&
+      (!navFocus ||
+        !/^\/library\/home\/?$/i.test(steamRoute(focusedDocument.defaultView)))
+    ) {
+      result.reason = 'Navigation focus belongs to a different Steam document'
       continue
-    if (!focused.getClientRects().length) continue
-    const style = win.getComputedStyle(focused)
-    if (style.visibility === 'hidden' || style.display === 'none') continue
+    }
+    if (!focused.getClientRects().length) {
+      result.reason = 'Focused node has no visible layout'
+      continue
+    }
+    const style = (focusedDocument.defaultView ?? win).getComputedStyle(focused)
+    if (style.visibility === 'hidden' || style.display === 'none') {
+      result.reason = 'Focused node is hidden'
+      continue
+    }
     const found = focusedAppId(focused)
     if (found)
       return {

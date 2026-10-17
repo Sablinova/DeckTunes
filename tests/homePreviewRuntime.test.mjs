@@ -6,7 +6,10 @@ const { installHomeScreenMusicPreview } = await loadTs(
   '../src/lib/homeScreenMusicPreview.ts',
   {
     '@decky/ui': moduleUrl(`
-    export const Router = { get RunningApps() { return globalThis.homeRuntimeTest.runningApps ?? [] } };
+    export const Router = {
+      get RunningApps() { return globalThis.homeRuntimeTest.runningApps ?? [] },
+      get WindowStore() { return { GamepadUIMainWindowInstance: { BrowserWindow: globalThis.homeRuntimeTest.routerMain } } }
+    };
     export const findSP = () => globalThis.homeRuntimeTest.win;
   `),
     '../cache/musicCache': moduleUrl(
@@ -210,6 +213,32 @@ test('empty search results leave a visible diagnostic reason instead of unexplai
     /search returned no playable theme/
   )
   assert.equal(f.data.audios.length, 0)
+})
+
+test('a different live Home renderer owning navigation focus can play despite the stale router document', async (t) => {
+  const f = fixture(t)
+  const liveWindow = new EventTarget()
+  liveWindow.location = { pathname: '/library/home' }
+  liveWindow.getComputedStyle = () => ({})
+  const liveDocument = new EventTarget()
+  liveDocument.defaultView = liveWindow
+  liveDocument.querySelectorAll = () => []
+  liveWindow.document = liveDocument
+  const focused = {
+    ...f.card,
+    ownerDocument: liveDocument,
+    closest: () => null,
+    __reactFiber$native: { memoizedProps: { overview: { appid: 570 } } }
+  }
+  f.data.routerMain = f.win
+  f.win.FocusNavController = {
+    m_ActiveContext: { m_lastFocusNode: { m_element: focused } }
+  }
+  f.reconcile()
+  await f.clock.tick(500)
+  assert.equal(f.data.audios[0].src, 'http://localhost/audio/cached-theme')
+  assert.equal(f.data.diagnostics.lastResult, 'Playing App 570')
+  assert.equal(f.data.observers[0].disconnected, true)
 })
 
 test('No Music remains silent and is never searched or overwritten', async (t) => {

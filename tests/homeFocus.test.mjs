@@ -183,3 +183,61 @@ test('bounded React fiber inspection handles cyclic/private fibers safely', () =
   const focused = focusedNode({ __reactFiber$test: fiber })
   assert.equal(getFocusedHomeAppId(document([focused])), null)
 })
+
+test('an invisible remembered navigation node cannot hide current gamepad card focus', () => {
+  const doc = document([card('730')])
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: { m_lastFocusNode: { m_element: card('570', false) } }
+  }
+  const result = inspectHomeFocus(doc)
+  assert.equal(result.appId, 730)
+  assert.equal(result.focusSource, 'gpfocus')
+  assert.match(result.ignoredNavigationNodes[0], /Hidden or empty-layout/)
+})
+
+test('a disconnected context focus falls through to a live tree node', () => {
+  const doc = document([])
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: { m_element: { ...card('570'), isConnected: false } },
+      m_rgGamepadNavigationTrees: [
+        { m_lastFocusNode: { m_Element: card('730') } }
+      ]
+    }
+  }
+  assert.equal(getFocusedHomeAppId(doc), 730)
+})
+
+test('current ActiveElementNavNode takes priority over the remembered node', () => {
+  const doc = document([])
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: { m_element: card('570') },
+      ActiveElementNavNode: { m_element: card('730') }
+    }
+  }
+  assert.equal(getFocusedHomeAppId(doc), 730)
+})
+
+test('foreign navigation-document failures report the exact reason and owner route', () => {
+  const doc = document([])
+  const other = document([], '/quickaccess')
+  const focused = { ...card('570'), ownerDocument: other }
+  doc.defaultView.FocusNavController = {
+    m_ActiveContext: { m_lastFocusNode: { m_element: focused } }
+  }
+  const result = inspectHomeFocus(doc)
+  assert.equal(result.appId, null)
+  assert.match(result.reason, /different Steam document/)
+  assert.equal(result.focusDocumentRoute, '/quickaccess')
+})
+
+test('live navigation focus remains usable during a Home document handoff before the next poll', () => {
+  const stale = document([])
+  const live = document([])
+  const focused = { ...card('730'), ownerDocument: live }
+  stale.defaultView.FocusNavController = {
+    m_ActiveContext: { m_lastFocusNode: { m_element: focused } }
+  }
+  assert.equal(getFocusedHomeAppId(stale), 730)
+})

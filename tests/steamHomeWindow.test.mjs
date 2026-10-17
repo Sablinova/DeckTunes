@@ -7,6 +7,7 @@ const { findSteamHomeWindow } = await loadTs('../src/lib/steamHomeWindow.ts', {
 })
 function window(pathname = '/about:blank', title = '') {
   const win = { location: { pathname }, document: { title } }
+  win.getComputedStyle = () => ({})
   win.document.defaultView = win
   return win
 }
@@ -61,4 +62,35 @@ test('a failing legacy window lookup cannot crash the preview runtime', () => {
     }).doc,
     host.document
   )
+})
+
+test('uses the visible navigation node ownerDocument when Router retains a stale Home renderer', () => {
+  const current = window()
+  const stale = window('/library/home', 'SP')
+  const live = window('/library/home', 'SP')
+  current.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: {
+        m_element: { ownerDocument: live.document, getClientRects: () => [{}] }
+      }
+    }
+  }
+  const located = findSteamHomeWindow(current, stale, stale)
+  assert.equal(located.doc, live.document)
+  assert.equal(located.hosts[0], current)
+  assert.equal(located.hosts.includes(live), true)
+})
+
+test('active Home-node ownership cannot override an authoritative details route', () => {
+  const current = window()
+  const main = window('/library/app/570')
+  const home = window('/library/home')
+  current.FocusNavController = {
+    m_ActiveContext: {
+      m_lastFocusNode: {
+        m_element: { ownerDocument: home.document, getClientRects: () => [{}] }
+      }
+    }
+  }
+  assert.equal(findSteamHomeWindow(current, home, main).doc, main.document)
 })

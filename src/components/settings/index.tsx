@@ -188,7 +188,10 @@ export default function Index() {
             <ButtonItem
               label={t('homePreviewDiagnostics')}
               description={
-                homeDiagnostics.lastResult || homeDiagnostics.playback
+                homeDiagnostics.lastResult ||
+                (homeDiagnostics.runtime === 'Running'
+                  ? (homeDiagnostics.focus?.reason ?? homeDiagnostics.playback)
+                  : homeDiagnostics.runtime)
               }
               layout="below"
               onClick={() =>
@@ -199,7 +202,9 @@ export default function Index() {
                       <pre
                         style={{
                           whiteSpace: 'pre-wrap',
-                          overflowWrap: 'anywhere'
+                          overflowWrap: 'anywhere',
+                          maxHeight: '45vh',
+                          overflowY: 'auto'
                         }}
                       >
                         {JSON.stringify(homeDiagnostics, null, 2)}
