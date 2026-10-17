@@ -6,7 +6,7 @@ by default, including for existing settings files.
 
 After a card stays focused for 500 ms, DeckTunes reads that game's
 `game-theme-music-cache` entry and resolves its saved video ID through the selected
-yt-dlp or Invidious resolver. If no theme is saved and Default Muted is off, it
+yt-dlp or Invidious resolver. If no theme is saved and Saved themes only is off, it
 searches for `<game name> Theme Music` through the same resolver, plays the result,
 and saves the video ID for future previews and game-details playback. Enable
 **Use yt-dlp** to search YouTube directly. Resolver/network latency and any queued
@@ -14,7 +14,7 @@ search can add to the 500 ms wait.
 Previously downloaded audio is reused by the existing yt-dlp backend. A cached
 selection can still require network access if the audio is not downloaded.
 
-Games explicitly set to **No Music** stay silent. With **Default Muted** enabled,
+Games explicitly set to **No Music** stay silent. With **Saved themes only** enabled,
 saved themes are allowed and games without a theme stay silent. With it disabled,
 uncached games and volume-only cache entries can discover a theme automatically.
 Automatic discovery streams the result and saves its selection; it does not
@@ -108,7 +108,7 @@ pnpm run build
 ```
 
 The tests cover debounce, rapid navigation, repeated focus, automatic discovery,
-cache reuse, Default Muted, No Music, isolated Home searches, manual search generation tokens,
+cache reuse, Saved themes only, No Music, isolated Home searches, manual search generation tokens,
 per-game/global volume, stale resolver responses, page/launch inhibition,
 AudioLoader ownership, live settings migration/updates, media errors, and cleanup.
 Tests use Node's test runner and the already-installed TypeScript transpiler.
@@ -132,7 +132,7 @@ configurations. Record the Steam client channel/version, SteamOS version, and De
    or choosing themes. Download one through the existing yt-dlp settings. Give
    one a per-game volume different from the global volume. Prepare a third game
    with **No Music**, plus a game with no cached selection. For automatic YouTube
-   discovery, enable Use yt-dlp and disable Default Muted.
+   discovery, enable Use yt-dlp and disable Saved themes only.
 3. Enable **Home Screen Music Preview** and close Quick Access. On the native Home
    recent-games row, focus a cached game with the D-pad. Confirm one looping theme
    starts after at least 500 ms plus any resolver latency. Verify the game volume,
@@ -143,7 +143,7 @@ configurations. Record the Steam client channel/version, SteamOS version, and De
 5. Focus No Music: confirm silence and no theme search or changed selection. Focus
    an uncached game without visiting its details: confirm automatic search and
    playback after the debounce plus network latency. Refocus it and verify the
-   saved selection is reused. Repeat with Default Muted enabled: uncached games
+   saved selection is reused. Repeat with Saved themes only enabled: uncached games
    stay silent while cached themes remain allowed. Verify a volume-only override
    survives discovery, and a search failure does not save an empty/No Music entry.
 6. Move focus to Home navigation/non-game controls and visit Library or Store.
@@ -193,7 +193,7 @@ result and attempted AppID even when opening Quick Access changes current focus.
 - `focusDocumentRoute: /index.html` with `focusTreeId: GamepadUI_Full_Root`:
   Home is rendered in Steam's shell document; this combination is accepted.
   `focusNode` records the selected node's tag/class for further identification.
-- `Default Muted prevents theme search` / `No Music is selected`: intentional silence.
+- Theme search blocked by **Saved themes only**, or **No Music** selected: intentional silence.
 - `search returned no playable theme` / `saved theme has no playable audio URL`:
   card detection worked; investigate the selected resolver or saved theme.
 - `Playback failed`: the media element reported a failure or rejected play().
