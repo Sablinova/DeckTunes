@@ -8,6 +8,7 @@ import Settings from './components/settings'
 import patchLibraryApp from './lib/patchLibraryApp'
 import patchContextMenu, { LibraryContextMenu } from './lib/patchContextMenu'
 import ChangeTheme from './components/changeTheme'
+import HomeScreenMusicPreview from './components/homeScreenMusicPreview'
 import {
   AudioLoaderCompatState,
   AudioLoaderCompatStateContextProvider
@@ -43,6 +44,9 @@ async function checkYtdlpUpdateOnLoad() {
 export default definePlugin(() => {
   const state: AudioLoaderCompatState = new AudioLoaderCompatState()
   const libraryPatch = patchLibraryApp(state)
+  routerHook.addGlobalComponent('DeckTunesHomeScreenMusicPreview', () => (
+    <HomeScreenMusicPreview state={state} />
+  ))
 
   // Check for yt-dlp updates after a short delay (let plugin fully initialize)
   setTimeout(() => {
@@ -87,6 +91,7 @@ export default definePlugin(() => {
     icon: <GiMusicalNotes />,
     content: <Settings />,
     onDismount() {
+      routerHook.removeGlobalComponent('DeckTunesHomeScreenMusicPreview')
       AppStateRegistrar.unregister()
       routerHook.removePatch('/library/app/:appid', libraryPatch)
       routerHook.removeRoute('/gamethememusic/:appid')

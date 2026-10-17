@@ -15,7 +15,7 @@ import {
   ToggleField
 } from '@decky/ui'
 import { useMemo } from 'react'
-import { SiDiscord, SiGithub } from "react-icons/si";
+import { SiDiscord, SiGithub } from 'react-icons/si'
 import { useSettings } from '../../hooks/useSettings'
 import useTranslations from '../../hooks/useTranslations'
 import {
@@ -24,7 +24,7 @@ import {
   FaSave,
   FaVolumeMute,
   FaVolumeUp,
-  FaYoutube,
+  FaYoutube
 } from 'react-icons/fa'
 import {
   clearCache,
@@ -48,7 +48,8 @@ export default function Index() {
     setUseYtDlp,
     setDownloadAudio,
     setInvidiousInstance,
-    setVolume
+    setVolume,
+    setHomeScreenMusicPreview
   } = useSettings()
 
   const t = useTranslations()
@@ -171,6 +172,15 @@ export default function Index() {
   return (
     <div>
       <PanelSection title={t('settings')}>
+        <PanelSectionRow>
+          <ToggleField
+            checked={settings.homeScreenMusicPreview}
+            disabled={settingsIsLoading}
+            label={t('homeScreenMusicPreview')}
+            description={t('homeScreenMusicPreviewDescription')}
+            onChange={setHomeScreenMusicPreview}
+          />
+        </PanelSectionRow>
         <PanelSectionRow>
           <SliderField
             label={t('volume')}
@@ -319,8 +329,18 @@ export default function Index() {
         </PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('extras')}>
-        <PanelSocialButton icon={<SiDiscord fill="#5865F2" />} url="https://deckbrew.xyz/discord">Discord</PanelSocialButton>
-        <PanelSocialButton icon={<SiGithub fill="#f5f5f5" />} url="https://github.com/Sablinova/DeckTunes">GitHub</PanelSocialButton>
+        <PanelSocialButton
+          icon={<SiDiscord fill="#5865F2" />}
+          url="https://deckbrew.xyz/discord"
+        >
+          Discord
+        </PanelSocialButton>
+        <PanelSocialButton
+          icon={<SiGithub fill="#f5f5f5" />}
+          url="https://github.com/Sablinova/DeckTunes"
+        >
+          GitHub
+        </PanelSocialButton>
       </PanelSection>
     </div>
   )

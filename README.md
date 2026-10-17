@@ -14,6 +14,9 @@
 - 🔄 **Auto-update** - Keep yt-dlp up-to-date with built-in update manager
 - ⚙️ **Customizable** - Volume control, auto-play toggle, loop settings
 - 🔌 **Backwards compatible** - Imports settings from SDH-GameThemeMusic
+- 🎧 **Home Screen Music Preview (experimental)** - Optional cached theme previews
+  after focusing a Gaming Mode Home game card for 500 ms; disabled by default.
+  See the [behavior and Steam Deck testing checklist](docs/home-screen-music-preview.md).
 
 ## 🆕 What's New in DeckTunes
 

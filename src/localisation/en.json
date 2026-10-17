@@ -29,6 +29,8 @@
     "gameSettings": "Game Settings",
     "gameVolumeDescription": "Adjust music volume for this game",
     "helpTranslate": "Help translate",
+    "homeScreenMusicPreview": "Home Screen Music Preview",
+    "homeScreenMusicPreviewDescription": "Experimental: preview cached game themes after focusing a Home screen game card for 500ms. Games without a cached theme stay silent.",
     "invidiousInstance": "Invidious Instance",
     "invidiousInstanceDescription": "Which Invidious instance would you like to use for searching and getting audio?",
     "noMusicLabel": "No Music",

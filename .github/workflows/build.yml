@@ -26,6 +26,9 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
       
+    - name: Test playback behavior
+      run: pnpm test
+
     - name: Build plugin
       run: pnpm run build
 
