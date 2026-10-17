@@ -67,131 +67,125 @@ export default function AudioPlayer({
   async function selectAudio() {
     if (audioUrl?.length && video.id.length) {
       setDownloading(true)
-      await selectNewAudio({
-        title: video.title,
-        videoId: video.id,
-        audioUrl: audioUrl
-      })
-      setDownloading(false)
+      try {
+        await selectNewAudio({
+          title: video.title,
+          videoId: video.id,
+          audioUrl: audioUrl
+        })
+      } finally {
+        setDownloading(false)
+      }
     }
   }
 
   if (!loading && !audioUrl) return <></>
   return (
-    <div>
-      <Focusable
+    <Focusable
+      style={{
+        background: 'rgba(255, 255, 255, 0.04)',
+        border: selected
+          ? '1px solid #67c1f5'
+          : '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: '8px',
+        padding: '12px',
+        minWidth: 0,
+        boxSizing: 'border-box'
+      }}
+    >
+      <img
+        src={video.thumbnail}
+        alt=""
         style={{
-          background: 'var(--main-editor-bg-color)',
-          borderRadius: '6px',
-          display: 'grid',
-          gridTemplateRows: 'max-content max-content max-content',
+          display: 'block',
+          width: '100%',
+          aspectRatio: '16 / 9',
+          objectFit: 'cover',
+          borderRadius: '4px',
+          background: '#171d25'
+        }}
+      />
+      <p
+        style={{
+          margin: '12px 0',
+          fontSize: '14px',
+          lineHeight: '20px',
+          height: '40px',
           overflow: 'hidden',
-          padding: '10px',
-          width: '230px'
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical'
         }}
       >
+        {video.title}
+      </p>
+      {loading || downloading ? (
         <div
+          role="status"
           style={{
-            position: 'relative',
-            width: '230px',
-            height: 0,
-            paddingBottom: '56.25%',
-            overflow: 'hidden'
+            height: '40px',
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '13px'
           }}
         >
-          <img
-            src={video.thumbnail}
-            alt={video.title}
-            style={{
-              overflow: 'hidden',
-              width: '230px',
-              borderRadius: '6px',
-              position: 'absolute',
-              top: '50%',
-              left: 0,
-              transform: 'translateY(-50%)',
-              height: 'auto'
-            }}
-          />
+          <Spinner />
+          {downloading ? t('applyingTheme') : t('loadingAudio')}
         </div>
-        <p
+      ) : (
+        <Focusable
+          flow-children="row"
           style={{
-            color: 'var(--main-editor-text-color)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            width: '230px',
-            height: '68px'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: '8px'
           }}
         >
-          {video.title}
-        </p>
-
-        {loading || downloading ? (
-          <div
+          <DialogButton
+            onClick={togglePlay}
+            disabled={!audioPlayer.isReady}
             style={{
-              height: '85px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center'
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 6px',
+              fontSize: '14px'
             }}
           >
-            {downloading && <div>Downloading...</div>}
-            <Spinner />
-          </div>
-        ) : (
-          <div
+            {video.isPlaying ? t('stop') : t('previewMusic')}
+          </DialogButton>
+          <DialogButton
+            disabled={selected}
+            onClick={selectAudio}
             style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              width: '230px'
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              minWidth: 0,
+              padding: '10px 6px',
+              fontSize: '14px'
             }}
           >
-            <DialogButton
-              onClick={togglePlay}
-              disabled={loading}
-              focusable={!loading}
-            >
-              {video.isPlaying ? t('stop') : t('play')}
-            </DialogButton>
-            <div style={{ position: 'relative' }}>
-              <DialogButton
-                disabled={selected || loading}
-                focusable={!selected && !loading}
-                onClick={selectAudio}
+            {selected ? (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  gap: '6px',
+                  alignItems: 'center'
+                }}
               >
-                {selected
-                  ? t('selected')
-                  : settings.downloadAudio
-                    ? t('download')
-                    : t('select')}
-              </DialogButton>
-              {selected ? (
-                <div
-                  style={{
-                    height: '20px',
-                    width: '20px',
-                    position: 'absolute',
-                    bottom: '-6px',
-                    right: '-6px',
-                    background: '#59bf40',
-                    borderRadius: '50%',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <FaCheck />
-                </div>
-              ) : (
-                ''
-              )}
-            </div>
-          </div>
-        )}
-      </Focusable>
-    </div>
+                <FaCheck />
+                {t('selected')}
+              </span>
+            ) : (
+              t('applyTheme')
+            )}
+          </DialogButton>
+        </Focusable>
+      )}
+    </Focusable>
   )
 }

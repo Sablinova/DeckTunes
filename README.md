@@ -2,7 +2,7 @@
 
 > **Credits:** DeckTunes is a modernized fork of [SDH-GameThemeMusic](https://github.com/moraroy/SDH-GameThemeMusic) by [moraroy](https://github.com/moraroy), which itself was a maintained fork of the original plugin by [OMGDuke](https://github.com/OMGDuke). Full credit and gratitude to both original authors for their excellent work.
 
-**Automatic game theme music for Steam Deck** - Plays your favorite game soundtracks automatically when you launch games.
+**Automatic game theme music for Steam Deck** - Play game themes on Home and game details. Music stops when a game launches.
 
 [![Chat](https://img.shields.io/badge/chat-on%20discord-7289da.svg)](https://deckbrew.xyz/discord)
 
@@ -12,10 +12,21 @@
 - 🔍 **Powered by yt-dlp** - Searches YouTube for official game soundtracks
 - 📦 **Offline playback** - Downloads themes locally for instant playback
 - 🔄 **Auto-update** - Keep yt-dlp up-to-date with built-in update manager
-- ⚙️ **Customizable** - Volume control, auto-play toggle, loop settings
+- ⚙️ **Customizable** - Global and per-game volume, shared song selections, and No Music overrides
 - 🔌 **Backwards compatible** - Imports settings from SDH-GameThemeMusic
+- 🎧 **Home Screen Music Preview (experimental)** - Optional theme previews
+  after focusing a Gaming Mode Home game card for 500 ms, with automatic theme
+  discovery for uncached games; disabled by default.
+  See the [behavior and Steam Deck testing checklist](docs/home-screen-music-preview.md).
 
 ## 🆕 What's New in DeckTunes
+
+### v1.9.0
+- Optional Home Screen Music Preview with a 500 ms focus delay; disabled by default.
+- One saved theme per game, shared by Home and game details.
+- Organized settings, compact theme cards, and improved Steam Deck layout and Tab navigation.
+- Persistent yt-dlp updates that survive plugin ZIP installs, with the existing update controls in Decky.
+- See the [release notes](docs/releases/v1.9.0.md) for details.
 
 ### v1.8.7
 - ✅ **Improved yt-dlp settings UI** - Shows current/latest versions automatically, update button only when needed
@@ -56,26 +67,31 @@
 
 1. **Launch DeckTunes** from the Decky Loader menu (... button → Plugins)
 2. **Navigate to a game** in your library
-3. **Theme music plays automatically** (if auto-play is enabled)
+3. **Theme music plays automatically** unless the game is set to No Music or has no saved theme while Saved themes only is enabled
 4. **Customize settings** in the DeckTunes menu:
    - Volume control
-   - Auto-play on/off
-   - Loop playback
-   - yt-dlp updates
+   - Saved themes only
+   - Home Screen Music Preview
+   - Music source, downloads, and yt-dlp updates
 5. **Customize per-game themes** via the game's context menu
 
 ![Customize themes](./assets/screenshot2.jpg)
 
 ## 🔧 Settings
 
-### Audio Settings
-- **Volume** - Adjust theme music volume (0-100%)
-- **Auto-play** - Automatically play themes when viewing games
+### Playback
+- **Music Volume** - Global volume, with optional overrides in each game's settings.
+- **Saved themes only** - Prevents automatic searches for games without a saved theme.
+- **Home Screen Music Preview** - Experimental Home previews; disabled by default.
 
-### yt-dlp
-- **Current Version** - Shows installed yt-dlp version
-- **Latest Version** - Shows latest available version
-- **Update Button** - Appears when an update is available
+### Music source and updates
+- **Use yt-dlp** - Search YouTube directly, or turn it off to use Invidious.
+- **Download when applying** - Save newly applied songs for offline playback with yt-dlp.
+- **Updates** - View the installed yt-dlp version, check for updates, and install a new version directly in Decky. Updates are retained across plugin ZIP installs that preserve Decky's runtime data.
+
+### Tools & support
+Choose **Open tools** for saved-theme backup/restore/reset, download management,
+Home preview diagnostics, Discord, GitHub, and QR-code links.
 
 ## 🤝 Compatibility
 

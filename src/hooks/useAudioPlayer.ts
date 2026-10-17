@@ -15,11 +15,7 @@ const useAudioPlayer = (
   const context = useAudioLoaderCompatState()
   // Defensive: context may be null if rendered outside AudioLoaderCompatStateContextProvider
   const setOnThemePage = context?.setOnThemePage ?? (() => {})
-  const onAppPage = context?.onAppPage ?? false
-
-  if (!onAppPage) {
-    setOnThemePage(true)
-  }
+  const gamesRunning = context?.gamesRunning ?? []
 
   const audioPlayer: HTMLAudioElement = useMemo(() => {
     const audio = new Audio()
@@ -36,23 +32,39 @@ const useAudioPlayer = (
   const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
+    stop()
+    setIsReady(false)
     if (audioUrl?.length) {
       audioPlayer.src = audioUrl
       audioPlayer.loop = true
+    } else {
+      audioPlayer.removeAttribute('src')
+      audioPlayer.load()
     }
   }, [audioUrl])
 
   useEffect(() => {
+    setOnThemePage(true)
     return () => {
       unload()
     }
   }, [])
 
+  useEffect(() => {
+    if (gamesRunning.length) stop()
+  }, [gamesRunning.length])
+
   function play() {
-    if (audioPlayer.readyState === HTMLMediaElement.HAVE_ENOUGH_DATA) {
-      audioPlayer.play()
-      setIsPlaying(true)
+    if (
+      !gamesRunning.length &&
+      audioPlayer.readyState === HTMLMediaElement.HAVE_ENOUGH_DATA
+    ) {
+      // Stop the Home owner before asking this page's audio element to play.
       setOnThemePage(true)
+      audioPlayer
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(console.debug)
     }
   }
 
@@ -81,6 +93,7 @@ const useAudioPlayer = (
   }
 
   function unload() {
+    audioPlayer.oncanplaythrough = null
     stop()
     audioPlayer.src = ''
     setIsPlaying(false)

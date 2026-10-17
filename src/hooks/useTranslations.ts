@@ -17,8 +17,9 @@ function useTranslations() {
   ): string {
     let result
     //
-    if (languages[lang]?.[key]?.length) {
-      result = languages[lang]?.[key]
+    const localized = languages[lang] as Partial<(typeof languages)['en']>
+    if (localized[key]?.length) {
+      result = localized[key]
     } else if (languages.en?.[key]?.length) {
       result = languages.en?.[key]
     } else {

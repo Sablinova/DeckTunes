@@ -9,7 +9,8 @@ import { Settings, defaultSettings } from '../hooks/useSettings'
 
 abstract class AudioResolver {
   abstract getYouTubeSearchResults(
-    searchTerm: string
+    searchTerm: string,
+    isCurrent?: () => boolean
   ): AsyncIterable<YouTubeVideoPreview>
   abstract getAudioUrlFromVideo(
     video: YouTubeVideo
@@ -17,11 +18,18 @@ abstract class AudioResolver {
   abstract downloadAudio(video: YouTubeVideo): Promise<boolean>
 
   async getAudio(
-    appName: string
+    appName: string,
+    isCurrent: () => boolean = () => true
   ): Promise<{ videoId: string; audioUrl: string } | undefined> {
-    const videos = this.getYouTubeSearchResults(appName + ' Theme Music')
+    if (!isCurrent()) return undefined
+    const videos = this.getYouTubeSearchResults(
+      appName + ' Theme Music',
+      isCurrent
+    )
     for await (const video of videos) {
+      if (!isCurrent()) return undefined
       const audioUrl = await this.getAudioUrlFromVideo(video)
+      if (!isCurrent()) return undefined
       if (audioUrl?.length) {
         return { audioUrl, videoId: video.id }
       }
@@ -112,18 +120,33 @@ class InvidiousAudioResolver extends AudioResolver {
 
 class YtDlpAudioResolver extends AudioResolver {
   async *getYouTubeSearchResults(
-    searchTerm: string
+    searchTerm: string,
+    isCurrent: () => boolean = () => true
   ): AsyncIterable<YouTubeVideoPreview> {
     try {
-      await call<[string]>('search_yt', searchTerm)
-      let result = await call<[], YouTubeVideoPreview | null>('next_yt_result')
+      if (!isCurrent()) return
+      const searchId = await call<[string], number | undefined>(
+        'search_yt',
+        searchTerm
+      )
+      if (!isCurrent()) return
+      const next = () =>
+        searchId === undefined
+          ? call<[], YouTubeVideoPreview | null>('next_yt_result')
+          : call<[number], YouTubeVideoPreview | null>(
+              'next_yt_result',
+              searchId
+            )
+      let result = await next()
       while (result) {
+        if (!isCurrent()) return
         yield result
-        result = await call<[], YouTubeVideoPreview | null>('next_yt_result')
+        if (!isCurrent()) return
+        result = await next()
       }
       return
     } catch (err) {
-      console.error(err)
+      if (isCurrent()) throw err
     }
     return
   }
@@ -136,10 +159,10 @@ class YtDlpAudioResolver extends AudioResolver {
       // This may return a local HTTP URL if the file has been downloaded before,
       // or a direct streaming URL from YouTube.
       // The backend returns either a dict {success, url, ...} or a string (for backwards compat)
-      const result = await call<[string], { success: boolean; url?: string; error?: string } | string | null>(
-        'single_yt_url',
-        video.id
-      )
+      const result = await call<
+        [string],
+        { success: boolean; url?: string; error?: string } | string | null
+      >('single_yt_url', video.id)
       if (result) {
         // Handle both dict response (new) and string response (old format)
         if (typeof result === 'string') {
@@ -163,9 +186,41 @@ class YtDlpAudioResolver extends AudioResolver {
   }
 }
 
-export function getResolver(useYtDlp: boolean): AudioResolver {
+// Automatic theme discovery must never hold up manual search results.
+// Home and details share selections; only background discoveries queue here.
+let discoverySearchQueue = Promise.resolve()
+class DiscoveryYtDlpAudioResolver extends YtDlpAudioResolver {
+  async *getYouTubeSearchResults(
+    searchTerm: string,
+    isCurrent: () => boolean = () => true
+  ): AsyncIterable<YouTubeVideoPreview> {
+    const previous = discoverySearchQueue
+    let release!: () => void
+    discoverySearchQueue = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previous
+    try {
+      if (!isCurrent()) return
+      const video = await call<[string], YouTubeVideoPreview | null>(
+        'search_home_yt',
+        searchTerm
+      )
+      if (video && isCurrent()) yield video
+    } finally {
+      release()
+    }
+  }
+}
+
+export function getResolver(
+  useYtDlp: boolean,
+  automaticDiscovery = false
+): AudioResolver {
   if (useYtDlp) {
-    return new YtDlpAudioResolver()
+    return automaticDiscovery
+      ? new DiscoveryYtDlpAudioResolver()
+      : new YtDlpAudioResolver()
   } else {
     return new InvidiousAudioResolver()
   }

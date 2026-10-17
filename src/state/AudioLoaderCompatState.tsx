@@ -19,7 +19,9 @@ export class AudioLoaderCompatState {
   private delayMs = 1000
   private gamesRunning: number[] = []
   private onThemePage: boolean = false
-  private lastOnThemePageTime: number = 0
+  private pageAudioActive = false
+  private homePreviewActive = false
+  private themePageVersion = 0
 
   // You can listen to this eventBus' 'stateUpdate' event and use that to trigger a useState or other function that causes a re-render
   public eventBus = new EventTarget()
@@ -27,7 +29,7 @@ export class AudioLoaderCompatState {
   getPublicState() {
     return {
       gamesRunning: this.gamesRunning,
-      onAppPage: this.onThemePage
+      onAppPage: this.pageAudioActive
     }
   }
 
@@ -47,25 +49,41 @@ export class AudioLoaderCompatState {
         }, i)
       }
     }
-    setTimeout(
-      () => {
-        this.forceUpdate()
-      },
-      noGamesRunning ? this.delayMs : 0
-    )
+    if (noGamesRunning) {
+      setTimeout(() => this.forceUpdate(), this.delayMs)
+    } else {
+      this.forceUpdate()
+    }
   }
 
   setOnThemePage(onAppPage: boolean) {
-    const time = Date.now()
+    const version = ++this.themePageVersion
+    this.pageAudioActive = onAppPage
+
+    // Claim page playback synchronously, before its audio starts. This stops
+    // Home previews even if their resolver is still in flight during navigation.
+    if (onAppPage) {
+      this.setOnThemePageInternal(true, version)
+      return
+    }
 
     // We need to delay the setting of onThemePage if false to
     // prevent AudioLoader music from playing during page transitions
     setTimeout(
       () => {
-        this.setOnThemePageInternal(onAppPage, time)
+        this.setOnThemePageInternal(onAppPage, version)
       },
       onAppPage ? 0 : this.delayMs
     )
+    // Home can start its own 500ms debounce immediately after the page exits;
+    // retain the delayed AudioLoader release separately for page transitions.
+    this.forceUpdate()
+  }
+
+  setHomePreviewActive(active: boolean) {
+    if (active === this.homePreviewActive) return
+    this.homePreviewActive = active
+    this.forceUpdate()
   }
 
   private setAudioLoaderEnabled(enabled: boolean) {
@@ -76,17 +94,16 @@ export class AudioLoaderCompatState {
     }
   }
 
-  private setOnThemePageInternal(onAppPage: boolean, time: number) {
-    if (time < this.lastOnThemePageTime) {
+  private setOnThemePageInternal(onAppPage: boolean, version: number) {
+    if (version !== this.themePageVersion) {
       return
     }
     this.onThemePage = onAppPage
-    this.lastOnThemePageTime = time
     this.forceUpdate()
   }
 
   private forceUpdate() {
-    if (this.onThemePage) {
+    if (this.onThemePage || this.homePreviewActive) {
       this.setAudioLoaderEnabled(false)
     } else {
       this.setAudioLoaderEnabled(this.gamesRunning.length === 0)

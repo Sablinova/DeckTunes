@@ -2,13 +2,14 @@ import {
   DialogButton,
   Focusable,
   SliderField,
+  PanelSection,
   PanelSectionRow,
   useParams
 } from '@decky/ui'
 import { useEffect, useState } from 'react'
 import { getCache, updateCache } from '../../cache/musicCache'
 
-import { getResolver } from '../../actions/audio'
+import useThemeMusic from '../../hooks/useThemeMusic'
 import useTranslations from '../../hooks/useTranslations'
 import { useSettings } from '../../hooks/useSettings'
 import { FaVolumeUp } from 'react-icons/fa'
@@ -19,34 +20,22 @@ export default function GameSettings() {
   const t = useTranslations()
   const { settings, isLoading: settingsIsLoading } = useSettings()
   const { appid } = useParams<{ appid: string }>()
-  const appDetails = appStore.GetAppOverviewByGameID(parseInt(appid))
-  const appName = appDetails?.display_name
 
-  const [currentAudio, setCurrentAudio] = useState<string>()
+  const { audio, isLoading: themeLoading } = useThemeMusic(parseInt(appid))
   const [themeVolume, setThemeVolume] = useState(settings.volume)
   const [loading, setLoading] = useState(true)
 
-  const audioPlayer = useAudioPlayer(currentAudio)
+  const audioPlayer = useAudioPlayer(audio.audioUrl)
 
   useEffect(() => {
     async function getData() {
       setLoading(true)
       try {
-        const resolver = getResolver(settings.useYtDlp)
         const cache = await getCache(parseInt(appid))
         if (typeof cache?.volume === 'number' && isFinite(cache.volume)) {
           setThemeVolume(cache.volume)
         } else {
           setThemeVolume(settings.volume)
-        }
-        if (cache?.videoId?.length) {
-          const newAudio = await resolver.getAudioUrlFromVideo({
-            id: cache?.videoId
-          })
-          setCurrentAudio(newAudio)
-        } else {
-          const newAudio = await resolver.getAudio(appName as string)
-          setCurrentAudio(newAudio?.audioUrl)
         }
       } catch (e) {
         console.error('Error loading game audio:', e)
@@ -64,56 +53,77 @@ export default function GameSettings() {
     updateCache(parseInt(appid), { volume: reset ? undefined : newVol })
   }
 
-  return (
-    <div>
-      <h2 style={{ margin: '20px 0' }}>{appName}</h2>
+  useEffect(() => {
+    if (audioPlayer.isReady) audioPlayer.setVolume(themeVolume)
+  }, [audioPlayer.isReady, themeVolume])
 
+  return (
+    <div
+      style={{
+        padding: '16px 24px 32px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        maxWidth: '728px',
+        margin: '0 auto'
+      }}
+    >
+      <PanelSection title={t('gameSettings')}>
+        <PanelSectionRow>
+          <SliderField
+            layout="below"
+            bottomSeparator="none"
+            label={t('volume')}
+            description={t('gameVolumeDescription')}
+            value={themeVolume * 100}
+            onChange={(value) => updateThemeVolume(value / 100)}
+            disabled={loading}
+            min={0}
+            max={100}
+            step={1}
+            icon={<FaVolumeUp />}
+            editableValue
+          />
+        </PanelSectionRow>
+      </PanelSection>
       <Focusable
+        flow-children="row"
         style={{
-          background: 'var(--main-editor-bg-color)',
-          borderRadius: '6px',
           display: 'grid',
-          gridGap: '16px',
-          gridTemplateColumns: '2fr max-content max-content',
-          height: 'max-content',
-          padding: '10px 10px 10px 16px',
-          alignItems: 'center'
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: '12px',
+          marginTop: '16px'
         }}
       >
-        <div style={{ padding: '0 10px' }}>
-          <PanelSectionRow>
-            <SliderField
-              layout="below"
-              bottomSeparator="none"
-              label={t('volume')}
-              description={t('gameVolumeDescription')}
-              value={themeVolume * 100}
-              onChange={(newVal) => updateThemeVolume(newVal / 100)}
-              min={0}
-              max={100}
-              step={1}
-              icon={<FaVolumeUp />}
-              editableValue
-            />
-          </PanelSectionRow>
-        </div>
         <DialogButton
           onClick={audioPlayer.togglePlay}
-          disabled={loading}
-          focusable={!loading}
-          style={{ height: 'max-content' }}
+          disabled={
+            loading || themeLoading || !audio.audioUrl || !audioPlayer.isReady
+          }
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box'
+          }}
         >
-          {loading ? (
+          {loading || themeLoading ? (
             <Spinner />
           ) : audioPlayer.isPlaying ? (
             t('stop')
           ) : (
-            t('play')
+            t('previewMusic')
           )}
         </DialogButton>
         <DialogButton
           onClick={() => updateThemeVolume(settings.volume, true)}
-          style={{ height: 'max-content' }}
+          disabled={loading}
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box'
+          }}
         >
           {t('resetVolume')}
         </DialogButton>
