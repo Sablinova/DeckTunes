@@ -9,7 +9,8 @@ import { Settings, defaultSettings } from '../hooks/useSettings'
 
 abstract class AudioResolver {
   abstract getYouTubeSearchResults(
-    searchTerm: string
+    searchTerm: string,
+    isCurrent?: () => boolean
   ): AsyncIterable<YouTubeVideoPreview>
   abstract getAudioUrlFromVideo(
     video: YouTubeVideo
@@ -17,11 +18,18 @@ abstract class AudioResolver {
   abstract downloadAudio(video: YouTubeVideo): Promise<boolean>
 
   async getAudio(
-    appName: string
+    appName: string,
+    isCurrent: () => boolean = () => true
   ): Promise<{ videoId: string; audioUrl: string } | undefined> {
-    const videos = this.getYouTubeSearchResults(appName + ' Theme Music')
+    if (!isCurrent()) return undefined
+    const videos = this.getYouTubeSearchResults(
+      appName + ' Theme Music',
+      isCurrent
+    )
     for await (const video of videos) {
+      if (!isCurrent()) return undefined
       const audioUrl = await this.getAudioUrlFromVideo(video)
+      if (!isCurrent()) return undefined
       if (audioUrl?.length) {
         return { audioUrl, videoId: video.id }
       }
@@ -110,20 +118,38 @@ class InvidiousAudioResolver extends AudioResolver {
   }
 }
 
+// search_yt / next_yt_result share one backend cursor. Keep each iterator's
+// reads together so Home, details, and manual searches cannot mix results.
+let ytSearchQueue = Promise.resolve()
+
 class YtDlpAudioResolver extends AudioResolver {
   async *getYouTubeSearchResults(
-    searchTerm: string
+    searchTerm: string,
+    isCurrent: () => boolean = () => true
   ): AsyncIterable<YouTubeVideoPreview> {
+    const previousSearch = ytSearchQueue
+    let release!: () => void
+    ytSearchQueue = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previousSearch
     try {
+      // Focus may have changed while this search waited for the backend.
+      if (!isCurrent()) return
       await call<[string]>('search_yt', searchTerm)
+      if (!isCurrent()) return
       let result = await call<[], YouTubeVideoPreview | null>('next_yt_result')
       while (result) {
+        if (!isCurrent()) return
         yield result
+        if (!isCurrent()) return
         result = await call<[], YouTubeVideoPreview | null>('next_yt_result')
       }
       return
     } catch (err) {
       console.error(err)
+    } finally {
+      release()
     }
     return
   }
@@ -136,10 +162,10 @@ class YtDlpAudioResolver extends AudioResolver {
       // This may return a local HTTP URL if the file has been downloaded before,
       // or a direct streaming URL from YouTube.
       // The backend returns either a dict {success, url, ...} or a string (for backwards compat)
-      const result = await call<[string], { success: boolean; url?: string; error?: string } | string | null>(
-        'single_yt_url',
-        video.id
-      )
+      const result = await call<
+        [string],
+        { success: boolean; url?: string; error?: string } | string | null
+      >('single_yt_url', video.id)
       if (result) {
         // Handle both dict response (new) and string response (old format)
         if (typeof result === 'string') {

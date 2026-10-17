@@ -39,6 +39,7 @@ import { toaster } from '@decky/api'
 import { getResolver } from '../../actions/audio'
 import PanelSocialButton from './socialButton'
 import YtdlpUpdateSection from './YtdlpUpdateSection'
+import { useHomePreviewDiagnostics } from '../../lib/homePreviewDiagnostics'
 
 export default function Index() {
   const {
@@ -53,6 +54,7 @@ export default function Index() {
   } = useSettings()
 
   const t = useTranslations()
+  const homeDiagnostics = useHomePreviewDiagnostics()
 
   const { instances, instancesLoading } = useInvidiousInstances()
 
@@ -181,6 +183,37 @@ export default function Index() {
             onChange={setHomeScreenMusicPreview}
           />
         </PanelSectionRow>
+        {settings.homeScreenMusicPreview && (
+          <PanelSectionRow>
+            <ButtonItem
+              label={t('homePreviewDiagnostics')}
+              description={
+                homeDiagnostics.lastResult || homeDiagnostics.playback
+              }
+              layout="below"
+              onClick={() =>
+                showModal(
+                  <ConfirmModal
+                    strTitle={t('homePreviewDiagnostics')}
+                    strDescription={
+                      <pre
+                        style={{
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere'
+                        }}
+                      >
+                        {JSON.stringify(homeDiagnostics, null, 2)}
+                      </pre>
+                    }
+                    strOKButtonText={t('close')}
+                  />
+                )
+              }
+            >
+              {t('homePreviewShowStatus')}
+            </ButtonItem>
+          </PanelSectionRow>
+        )}
         <PanelSectionRow>
           <SliderField
             label={t('volume')}

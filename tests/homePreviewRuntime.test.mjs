@@ -10,7 +10,14 @@ const { installHomeScreenMusicPreview } = await loadTs(
     export const findSP = () => globalThis.homeRuntimeTest.win;
   `),
     '../cache/musicCache': moduleUrl(
-      'export const getCache = (id) => globalThis.homeRuntimeTest.cache.get(id)'
+      `export const getCache = (id) => globalThis.homeRuntimeTest.cache.get(id);
+       export const updateCache = async (id, value, shouldUpdate) => {
+         const data = globalThis.homeRuntimeTest;
+         if (!shouldUpdate(data.cache.get(id))) return data.cache.get(id);
+         data.writes.push({id, ...value});
+         data.cache.set(id, {...data.cache.get(id), ...value});
+         return data.cache.get(id);
+       };`
     ),
     '../actions/audio': moduleUrl(`
     export const getResolver = (useYtDlp) => {
@@ -18,17 +25,32 @@ const { installHomeScreenMusicPreview } = await loadTs(
       return { getAudioUrlFromVideo: async ({id}) => {
         globalThis.homeRuntimeTest.resolved.push(id);
         return 'http://localhost/audio/' + id;
+      }, getAudio: async (name, isCurrent) => {
+        const data = globalThis.homeRuntimeTest;
+        data.searched.push(name);
+        if (data.search) return data.search(name, isCurrent);
+        return {videoId: 'found-' + name, audioUrl: 'stream:' + name};
       } };
     };
   `),
     './homeFocus': tsModuleUrl('../src/lib/homeFocus.ts'),
+    './steamHomeWindow': tsModuleUrl('../src/lib/steamHomeWindow.ts', {
+      './homeFocus': tsModuleUrl('../src/lib/homeFocus.ts')
+    }),
+    './homePreviewDiagnostics': moduleUrl(
+      'export const updateHomePreviewDiagnostics = (patch) => Object.assign(globalThis.homeRuntimeTest.diagnostics, patch)'
+    ),
     './homePreviewController': tsModuleUrl(
       '../src/lib/homePreviewController.ts'
     )
   }
 )
 
-function fixture(t, entries = [[570, { videoId: 'cached-theme', volume: 0 }]]) {
+function fixture(
+  t,
+  entries = [[570, { videoId: 'cached-theme', volume: 0 }]],
+  settings = {}
+) {
   const clock = fakeClock(t)
   const win = new EventTarget()
   win.location = { pathname: '/library/home' }
@@ -48,15 +70,29 @@ function fixture(t, entries = [[570, { videoId: 'cached-theme', volume: 0 }]]) {
     cache: new Map(entries),
     backends: [],
     resolved: [],
+    searched: [],
+    writes: [],
+    names: new Map([
+      [570, 'Dota™ 2'],
+      [730, 'Counter-Strike®'],
+      [440, 'Team Fortress 2']
+    ]),
     audios: [],
-    observers: []
+    observers: [],
+    diagnostics: {}
   }
   globalThis.homeRuntimeTest = data
   const originals = {
+    window: globalThis.window,
+    appStore: globalThis.appStore,
     Audio: globalThis.Audio,
     MutationObserver: globalThis.MutationObserver,
     setInterval: globalThis.setInterval,
     clearInterval: globalThis.clearInterval
+  }
+  globalThis.window = win
+  globalThis.appStore = {
+    GetAppOverviewByGameID: (id) => ({ display_name: data.names.get(id) })
   }
   let reconcile,
     cleared = false
@@ -105,7 +141,9 @@ function fixture(t, entries = [[570, { videoId: 'cached-theme', volume: 0 }]]) {
   }
   const cleanup = installHomeScreenMusicPreview(state, {
     useYtDlp: true,
-    volume: 0.7
+    volume: 0.7,
+    defaultMuted: false,
+    ...settings
   })
   t.after(() => {
     cleanup()
@@ -118,6 +156,7 @@ function fixture(t, entries = [[570, { videoId: 'cached-theme', volume: 0 }]]) {
     activity,
     publicState,
     doc,
+    card,
     win,
     cleanup,
     reconcile: () => reconcile(),
@@ -145,17 +184,150 @@ test('runtime uses the existing cache, selected resolver and zero-volume overrid
   assert.deepEqual(f.activity, [true])
 })
 
-test('runtime never invokes a resolver for uncached, volume-only or No Music entries', async (t) => {
-  const f = fixture(t, [
-    [570, { videoId: '' }],
-    [730, { volume: 0.5 }]
-  ])
+test('native cards on modern Steam routes play via nav-tree focus and React AppID data', async (t) => {
+  const f = fixture(t)
+  f.win.location.pathname = '/routes/library/home'
+  f.card.closest = () => null
+  f.card.__reactFiber$native = { memoizedProps: { overview: { appid: 570 } } }
+  f.doc.querySelectorAll = () => []
+  f.win.FocusNavController = {
+    m_ActiveContext: { m_lastFocusNode: { m_element: f.card } }
+  }
+  f.reconcile()
+  await f.clock.tick(500)
+  assert.equal(f.data.audios[0].src, 'http://localhost/audio/cached-theme')
+  assert.equal(f.data.diagnostics.focus.appIdSource, 'React overview')
+  assert.equal(f.data.diagnostics.focus.focusSource, 'Steam navigation tree')
+  assert.equal(f.data.diagnostics.lastResult, 'Playing App 570')
+})
+
+test('empty search results leave a visible diagnostic reason instead of unexplained silence', async (t) => {
+  const f = fixture(t, [])
+  f.data.search = async () => undefined
+  await f.clock.tick(500)
+  assert.match(
+    f.data.diagnostics.lastResult,
+    /search returned no playable theme/
+  )
+  assert.equal(f.data.audios.length, 0)
+})
+
+test('No Music remains silent and is never searched or overwritten', async (t) => {
+  const f = fixture(t, [[570, { videoId: '' }]])
+  await f.clock.tick(500)
+  assert.deepEqual(f.data.resolved, [])
+  assert.deepEqual(f.data.searched, [])
+  assert.deepEqual(f.data.writes, [])
+  assert.equal(f.data.audios.length, 0)
+})
+
+test('uncached Home games are searched after debounce, played and cached for reuse', async (t) => {
+  const f = fixture(t, [])
+  await f.clock.tick(499)
+  assert.deepEqual(f.data.searched, [])
+  await f.clock.tick(1)
+  assert.deepEqual(f.data.searched, ['Dota 2'])
+  assert.deepEqual(f.data.backends, [true])
+  assert.equal(f.data.cache.get(570).videoId, 'found-Dota 2')
+  assert.equal(f.data.audios[0].src, 'stream:Dota 2')
+  f.setFocusedId(0)
+  f.reconcile()
+  f.focus(570)
+  await f.clock.tick(500)
+  assert.deepEqual(f.data.searched, ['Dota 2'])
+  assert.deepEqual(f.data.resolved, ['found-Dota 2'])
+})
+
+test('automatic discovery preserves volume-only overrides, including zero', async (t) => {
+  const f = fixture(t, [[570, { volume: 0 }]])
+  await f.clock.tick(500)
+  assert.equal(f.data.cache.get(570).volume, 0)
+  assert.equal(f.data.audios[0].volume, 0)
+})
+
+test('Default Muted prevents discovery for missing themes and volume-only entries', async (t) => {
+  const f = fixture(t, [[570, { volume: 0.5 }]], { defaultMuted: true })
   await f.clock.tick(500)
   f.focus(730)
   await f.clock.tick(500)
-  f.focus(440)
+  assert.deepEqual(f.data.searched, [])
+  assert.deepEqual(f.data.writes, [])
+  assert.equal(f.data.audios.length, 0)
+})
+
+test('Default Muted still permits saved themes', async (t) => {
+  const f = fixture(t, [[570, { videoId: 'saved' }]], { defaultMuted: true })
   await f.clock.tick(500)
-  assert.deepEqual(f.data.resolved, [])
+  assert.equal(f.data.audios[0].src, 'http://localhost/audio/saved')
+  assert.deepEqual(f.data.searched, [])
+})
+
+test('discovery uses the selected resolver without overriding the source setting', async (t) => {
+  const f = fixture(t, [], { useYtDlp: false })
+  await f.clock.tick(500)
+  assert.deepEqual(f.data.backends, [false])
+  assert.equal(f.data.audios[0].src, 'stream:Dota 2')
+})
+
+test('missing game names and empty search results are not cached', async (t) => {
+  const f = fixture(t, [])
+  f.data.names.delete(570)
+  await f.clock.tick(500)
+  assert.deepEqual(f.data.searched, [])
+  f.data.search = async () => undefined
+  f.focus(730)
+  await f.clock.tick(500)
+  assert.deepEqual(f.data.writes, [])
+  assert.equal(f.data.audios.length, 0)
+})
+
+test('an obsolete automatic search cannot cache or play its result after focus changes', async (t) => {
+  const f = fixture(t, [])
+  let finish, stillCurrent
+  f.data.search = (_name, isCurrent) => {
+    stillCurrent = isCurrent
+    return new Promise((resolve) => {
+      finish = resolve
+    })
+  }
+  await f.clock.tick(500)
+  assert.equal(stillCurrent(), true)
+  f.focus(730)
+  assert.equal(stillCurrent(), false)
+  finish({ videoId: 'obsolete', audioUrl: 'old' })
+  await flush()
+  assert.deepEqual(f.data.writes, [])
+  assert.equal(f.data.audios.length, 0)
+})
+
+test('manual theme or No Music selections made during discovery take precedence', async (t) => {
+  const f = fixture(t, [])
+  let finish
+  f.data.search = () =>
+    new Promise((resolve) => {
+      finish = resolve
+    })
+  await f.clock.tick(500)
+  f.data.cache.set(570, { videoId: '' })
+  finish({ videoId: 'automatic', audioUrl: 'old' })
+  await flush()
+  assert.deepEqual(f.data.writes, [])
+  assert.equal(f.data.cache.get(570).videoId, '')
+  assert.equal(f.data.audios.length, 0)
+})
+
+test('plugin cleanup prevents a pending discovery from caching or playing', async (t) => {
+  const f = fixture(t, [])
+  let finish
+  f.data.search = () =>
+    new Promise((resolve) => {
+      finish = resolve
+    })
+  await f.clock.tick(500)
+  f.cleanup()
+  finish({ videoId: 'obsolete', audioUrl: 'old' })
+  await flush()
+  assert.deepEqual(f.data.writes, [])
   assert.equal(f.data.audios.length, 0)
 })
 

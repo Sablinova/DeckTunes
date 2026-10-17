@@ -30,12 +30,15 @@ export default function ChangeTheme() {
       setVideos([])
       try {
         const resolver = getResolver(settings.useYtDlp)
-        const res = resolver.getYouTubeSearchResults(searchTerm)
+        const res = resolver.getYouTubeSearchResults(searchTerm, () => !ignore)
         for await (const video of res) {
           if (ignore) {
             break
           }
-          setVideos((oldVideos) => [...oldVideos, { isPlaying: false, ...video }])
+          setVideos((oldVideos) => [
+            ...oldVideos,
+            { isPlaying: false, ...video }
+          ])
         }
       } catch (e) {
         console.error('Error fetching YouTube results:', e)

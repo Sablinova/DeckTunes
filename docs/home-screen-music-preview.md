@@ -4,18 +4,30 @@ Enable **Home Screen Music Preview** in DeckTunes settings to preview the theme
 of a focused game card on the Steam Deck Gaming Mode Home screen. It is disabled
 by default, including for existing settings files.
 
-After a card stays focused for 500 ms, DeckTunes reads that game's existing
+After a card stays focused for 500 ms, DeckTunes reads that game's
 `game-theme-music-cache` entry and resolves its saved video ID through the selected
-yt-dlp or Invidious resolver. Resolver/network latency can add to the 500 ms wait.
+yt-dlp or Invidious resolver. If no theme is saved and Default Muted is off, it
+searches for `<game name> Theme Music` through the same resolver, plays the result,
+and saves the video ID for future previews and game-details playback. Enable
+**Use yt-dlp** to search YouTube directly. Resolver/network latency and any queued
+search can add to the 500 ms wait.
 Previously downloaded audio is reused by the existing yt-dlp backend. A cached
 selection can still require network access if the audio is not downloaded.
 
-Games without a cached video ID, volume-only cache entries, and games explicitly
-set to **No Music** stay silent. Home browsing never searches for new themes,
-downloads new selections, or writes cache entries. Default Muted retains its
-existing behavior: saved themes are allowed, and games without a theme stay silent.
+Games explicitly set to **No Music** stay silent. With **Default Muted** enabled,
+saved themes are allowed and games without a theme stay silent. With it disabled,
+uncached games and volume-only cache entries can discover a theme automatically.
+Automatic discovery streams the result and saves its selection; it does not
+download a full audio file, matching the existing game-details discovery behavior.
+Search failures and missing game names remain silent without writing a cache entry.
 The saved per-game volume takes priority over the global volume, including a
 per-game volume of zero.
+
+Automatic and manual yt-dlp searches share a queue because the existing backend
+has a single search cursor. This keeps game results separate. Obsolete queued
+searches are skipped; in-flight requests may finish, but cancelled results cannot
+start playback or save a selection. A manual theme or No Music selection made
+during discovery takes precedence over the automatic result.
 
 Changing focus immediately releases the previous audio. Leaving Home, hiding the
 Steam document, entering a game page, starting a game, disabling the toggle, or
@@ -33,24 +45,37 @@ Investigated Deck-Shelves at commit
   uses `.gpfocus[data-appid]` to capture a focused game card.
 - [focusedCardTracker](https://github.com/santojon/Deck-Shelves/blob/b46fbf84d590783ff95132df75cf30ba09708b08/src/core/focusedCardTracker.ts)
   reads `data-appid`, subscribes to focus events, and seeds from gamepad/DOM focus.
+- [focusRestore](https://github.com/santojon/Deck-Shelves/blob/b46fbf84d590783ff95132df75cf30ba09708b08/src/core/focusRestore.ts)
+  reads the active navigation context's `m_lastFocusNode` and tree focus because
+  some clients apply neither `gpfocus` nor DOM focus consistently. It also handles
+  the modern `GamepadUI_Full_Root` tree instead of relying on the older `root_1_`.
 - [PerShelfHero](https://github.com/santojon/Deck-Shelves/blob/b46fbf84d590783ff95132df75cf30ba09708b08/src/components/shelf/PerShelfHero.tsx)
   explains that Steam's native gamepad navigation can change `gpfocus` without
   firing `focusin`, and also supports actual DOM focus on clients without that class.
 - [steamHost](https://github.com/santojon/Deck-Shelves/blob/b46fbf84d590783ff95132df75cf30ba09708b08/src/runtime/steamHost.ts)
   distinguishes the actual Steam window/document from the plugin host context.
 
-DeckTunes uses the Gaming Mode main window (with Decky's `findSP()` fallback),
-restricts detection to `/library/home`, and reads `data-appid` on the `.gpfocus`
-element or its enclosing card. DOM focus is a fallback when no gamepad focus class
-exists. A MutationObserver handles class changes and card replacement; focus and
+DeckTunes finds the Gaming Mode document through its rendered host, Steam's main
+window store, or navigation-tree root documents, with Decky's legacy `findSP()`
+as a fallback. It recognizes both `/library/home` and `/routes/library/home`,
+including hash routes. Active navigation-context focus takes priority over DOM
+classes, including while Quick Access or a modal owns focus. `gpfocus` and actual
+DOM focus are fallbacks.
+
+For a focused card, DeckTunes reads `data-appid` when available. Native Steam
+cards can instead expose AppIDs in their direct React props or bounded ancestor
+fibers (`overview`, `appOverview`, `app`, or AppID props). A single capsule artwork
+inside the focused node can identify a card when neither is available. It never
+walks sibling games or page-wide React children, and never chooses the first
+artwork of a multi-card carousel. A MutationObserver handles card replacement; focus and
 visibility events provide immediate updates. An enabled-only 100 ms fallback
 handles `pushState`, running-app changes, and late/replaced Steam documents.
 The 500 ms debounce starts when a focus change is observed; repeated observations
 of the same AppID do not restart it or create another audio element.
 
 Deck-Shelves is a research reference, not a runtime dependency. Steam DOM and
-window APIs are unofficial: a client that no longer exposes usable focus/AppID
-data will stay silent. Native recent-game cards and Deck-Shelves cards both need
+window APIs are unofficial: a client that exposes none of these usable focus/AppID
+signals will stay silent. Native recent-game cards and Deck-Shelves cards both need
 hardware confirmation; the local tests simulate their focus contracts.
 
 ## Local validation
@@ -62,8 +87,9 @@ pnpm exec tsc --noEmit --skipLibCheck
 pnpm run build
 ```
 
-The tests cover debounce, rapid navigation, repeated focus, cached-only resolution,
-No Music, per-game/global volume, stale resolver responses, page/launch inhibition,
+The tests cover debounce, rapid navigation, repeated focus, automatic discovery,
+cache reuse, Default Muted, No Music, shared yt-dlp search serialization,
+per-game/global volume, stale resolver responses, page/launch inhibition,
 AudioLoader ownership, live settings migration/updates, media errors, and cleanup.
 Tests use Node's test runner and the already-installed TypeScript transpiler.
 
@@ -83,7 +109,8 @@ Record the Steam client channel/version, SteamOS version, and Decky version.
 2. Prepare two games with different cached themes by opening their details pages
    or choosing themes. Download one through the existing yt-dlp settings. Give
    one a per-game volume different from the global volume. Prepare a third game
-   with **No Music**, plus a game with no cached selection.
+   with **No Music**, plus a game with no cached selection. For automatic YouTube
+   discovery, enable Use yt-dlp and disable Default Muted.
 3. Enable **Home Screen Music Preview** and close Quick Access. On the native Home
    recent-games row, focus a cached game with the D-pad. Confirm one looping theme
    starts after at least 500 ms plus any resolver latency. Verify the game volume,
@@ -91,13 +118,21 @@ Record the Steam client channel/version, SteamOS version, and Decky version.
 4. Scroll rapidly between cards in under 500 ms. Confirm intermediate games do
    not resolve/play, old audio stops immediately, and only the final card plays
    after its own debounce. Leave the same card selected and verify no restarts.
-5. Focus No Music and uncached games. Confirm silence and no theme search or new
-   cache entries. Repeat with Default Muted enabled; cached themes remain allowed.
+5. Focus No Music: confirm silence and no theme search or changed selection. Focus
+   an uncached game without visiting its details: confirm automatic search and
+   playback after the debounce plus network latency. Refocus it and verify the
+   saved selection is reused. Repeat with Default Muted enabled: uncached games
+   stay silent while cached themes remain allowed. Verify a volume-only override
+   survives discovery, and a search failure does not save an empty/No Music entry.
 6. Move focus to Home navigation/non-game controls and visit Library or Store.
    Confirm the Home preview stops. Return Home and verify a fresh debounce.
 7. While music plays, open that game's details and a different game's details.
    Confirm only the existing details player plays, with no overlapping Home
    audio. Repeat before the debounce expires and while the resolver is slow.
+   Start an uncached Home search and then open Change Theme Music: verify each
+   search shows results for its own game. Switch cards during a search and verify
+   the old result neither plays nor changes the old game's selection. Select No
+   Music manually while a search is in flight and confirm it remains selected.
 8. Launch a game while previewing or resolving. Confirm playback stops on the
    app-lifetime notification and stays stopped when opening Home over the running
    game. Exit the game and verify previews recover. Reload DeckTunes with a game
@@ -114,8 +149,24 @@ Record the Steam client channel/version, SteamOS version, and Decky version.
     card controls, and with it disabled. Test native recent-game cards first;
     successful Deck-Shelves playback alone does not establish native compatibility.
 
-For focus troubleshooting, inspect the actual Gaming Mode SP document at
-`/library/home`, not Decky's host document. Check `.gpfocus[data-appid]`, a
-`.gpfocus` child with a `[data-appid]` ancestor, and `document.activeElement`.
-If Steam exposes none of those contracts, leave the experiment disabled and
-capture the card markup before extending detection.
+## Diagnosing silence on hardware
+
+After installing the updated ZIP, enable the preview, close Quick Access, and
+focus a game that plays correctly on its details page. Wait several seconds, then
+open DeckTunes and choose **Home Preview Diagnostics → Show preview status**.
+The report identifies build `home-preview-focus-v2` and retains the last playback
+result and attempted AppID even when opening Quick Access changes current focus.
+
+- `runtime: Not started`: the global preview component has not mounted.
+- `Steam UI window not found`: no usable Steam window/document was found.
+- `Not on the Home screen`: check the recorded route.
+- `Focused control has no game AppID`: focus exists, but card identification failed.
+- `Default Muted prevents theme search` / `No Music is selected`: intentional silence.
+- `search returned no playable theme` / `saved theme has no playable audio URL`:
+  card detection worked; investigate the selected resolver or saved theme.
+- `Playback failed`: the media element reported a failure or rejected play().
+
+Capture that report for further debugging. Current QAM focus can report no game;
+`lastAppId` and `lastResult` preserve what happened before the menu was opened.
+The original cached-only build did not have this diagnostic panel. A successful
+build or local mock test does not establish on-device compatibility.
