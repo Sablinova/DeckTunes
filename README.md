@@ -14,7 +14,7 @@
 - 🔄 **Auto-update** - Keep yt-dlp up-to-date with built-in update manager
 - ⚙️ **Customizable** - Global and per-game volume, shared song selections, and No Music overrides
 - 🔌 **Backwards compatible** - Imports settings from SDH-GameThemeMusic
-- 🎧 **Home Screen Music Preview (experimental)** - Optional theme previews
+- 🎧 **Home Screen Music Preview** - Optional theme previews
   after focusing a Gaming Mode Home game card for 500 ms, with automatic theme
   discovery for uncached games; disabled by default.
   See the [behavior and Steam Deck testing checklist](docs/home-screen-music-preview.md).
@@ -82,7 +82,7 @@
 ### Playback
 - **Music Volume** - Global volume, with optional overrides in each game's settings.
 - **Saved themes only** - Prevents automatic searches for games without a saved theme.
-- **Home Screen Music Preview** - Experimental Home previews; disabled by default.
+- **Home Screen Music Preview** - Preview the focused Home game; disabled by default.
 
 ### Music source and updates
 - **Use yt-dlp** - Search YouTube directly, or turn it off to use Invidious.

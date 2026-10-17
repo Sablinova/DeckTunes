@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.9.0] - 2026-10-17
 
 ### Added
-- Experimental Home Screen Music Preview for Steam Deck Gaming Mode, disabled by default. Focus a game card for 500 ms to preview its saved theme or discover one using the configured music source.
+- Home Screen Music Preview for Steam Deck Gaming Mode, disabled by default. Focus a game card for 500 ms to preview its saved theme or discover one using the configured music source.
 - Shared theme resolution and song selections across Home, game details, and per-game settings, including No Music and per-game volume.
 - Home preview diagnostics under Tools & support.
 

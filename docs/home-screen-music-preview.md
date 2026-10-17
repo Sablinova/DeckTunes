@@ -1,4 +1,4 @@
-# Home Screen Music Preview (experimental)
+# Home Screen Music Preview
 
 Enable **Home Screen Music Preview** in DeckTunes settings to preview the theme
 of a focused game card on the Steam Deck Gaming Mode Home screen. It is disabled
@@ -125,7 +125,7 @@ on Steam Deck Gaming Mode. The development environment cannot run Steam Deck
 hardware tests; the checklist below covers additional scenarios and client
 configurations. Record the Steam client channel/version, SteamOS version, and Decky version.
 
-1. Install the experimental ZIP using Decky's developer **Install Plugin From Zip**
+1. Install the DeckTunes ZIP using Decky's developer **Install Plugin From Zip**
    flow. With existing settings, verify the new toggle is off. Open game details
    and confirm normal theme playback and Change Theme Music still work.
 2. Prepare two games with different cached themes by opening their details pages

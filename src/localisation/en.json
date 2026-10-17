@@ -32,7 +32,7 @@
     "homeScreenMusicPreview": "Home Screen Music Preview",
     "homePreviewDiagnostics": "Home Preview Diagnostics",
     "homePreviewShowStatus": "Show preview status",
-    "homeScreenMusicPreviewDescription": "Experimental: preview the focused Home game. Uses the same song as game details.",
+    "homeScreenMusicPreviewDescription": "Preview the focused Home game. Uses the same song as game details.",
     "invidiousInstance": "Invidious Instance",
     "invidiousInstanceDescription": "Server used to search and stream music.",
     "noMusicLabel": "No Music",

@@ -75,7 +75,7 @@
     "noBackupsFound": "暂无备份，请先备份已保存的主题曲。",
     "downloadsRequireYtdlp": "启用 yt-dlp 后可下载歌曲，供离线播放。",
     "homeScreenMusicPreview": "Home Screen Music Preview",
-    "homeScreenMusicPreviewDescription": "实验功能：预览首页选中游戏的主题曲，与详情页共用同一首歌。",
+    "homeScreenMusicPreviewDescription": "预览首页选中游戏的主题曲，与详情页共用同一首歌。",
     "homePreviewDiagnostics": "首页预览诊断",
     "homePreviewShowStatus": "查看预览状态",
     "sharedThemeDescription": "每个游戏共用一首主题曲，同时应用于首页和详情页。",
