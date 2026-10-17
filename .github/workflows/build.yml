@@ -50,6 +50,8 @@ jobs:
         cp package.json "./DeckTunes/"
         cp LICENSE "./DeckTunes/"
         cp README.md "./DeckTunes/"
+        cp CHANGELOG.md "./DeckTunes/"
+        cp -r docs "./DeckTunes/"
         cp -r dist "./DeckTunes/"
         cp -r bin "./DeckTunes/"
         [ -d "assets" ] && cp -r assets "./DeckTunes/" || true

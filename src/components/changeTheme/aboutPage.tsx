@@ -8,7 +8,7 @@ export default function AboutPage() {
   return (
     <div
       style={{
-        padding: '16px 24px 32px',
+        padding: '0 24px 24px',
         width: '100%',
         minWidth: 0,
         boxSizing: 'border-box',
@@ -16,9 +16,9 @@ export default function AboutPage() {
         margin: '0 auto'
       }}
     >
-      <h1>{t('aboutLabel')}</h1>
-      <p>{t('aboutDescription')}</p>
-      <p style={{ fontSize: '0.85em', opacity: 0.8, marginTop: '10px' }}>
+      <h1 style={{ margin: '0 0 12px' }}>{t('aboutLabel')}</h1>
+      <p style={{ margin: '0 0 10px' }}>{t('aboutDescription')}</p>
+      <p style={{ fontSize: '0.85em', opacity: 0.8, margin: '0 0 16px' }}>
         DeckTunes is a fork of SDH-GameThemeMusic by moraroy & OMGDuke.
       </p>
       <PanelSection title={t('supportSection')}>

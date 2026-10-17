@@ -83,13 +83,25 @@ export default function ChangePage({
         margin: '0 auto'
       }}
     >
+      <label
+        htmlFor={`decktunes-theme-search-${appid}`}
+        style={{
+          display: 'block',
+          marginBottom: '8px',
+          fontSize: '12px',
+          fontWeight: 500,
+          color: '#aab5c2'
+        }}
+      >
+        {t('musicSearchPlaceholder')}
+      </label>
       <Focusable
         flow-children="row"
         style={{
           display: 'grid',
           gap: '12px',
           gridTemplateColumns: 'minmax(0, 1fr) 112px 96px',
-          alignItems: 'end',
+          alignItems: 'center',
           marginBottom: '20px'
         }}
       >
@@ -101,7 +113,8 @@ export default function ChangePage({
           }}
         >
           <TextField
-            label={t('musicSearchPlaceholder')}
+            id={`decktunes-theme-search-${appid}`}
+            aria-label={t('musicSearchPlaceholder')}
             onChange={(event) => setSearchTerm(event.target.value)}
             value={searchTerm}
           />
@@ -113,7 +126,10 @@ export default function ChangePage({
             width: '100%',
             minWidth: 0,
             maxWidth: '100%',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            height: '40px',
+            minHeight: '40px',
+            margin: 0
           }}
         >
           {t('search')}
@@ -124,7 +140,10 @@ export default function ChangePage({
             width: '100%',
             minWidth: 0,
             maxWidth: '100%',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            height: '40px',
+            minHeight: '40px',
+            margin: 0
           }}
         >
           {t('reset')}

@@ -93,8 +93,9 @@ of the same AppID do not restart it or create another audio element.
 
 Deck-Shelves is a research reference, not a runtime dependency. Steam DOM and
 window APIs are unofficial: a client that exposes none of these usable focus/AppID
-signals will stay silent. Native recent-game cards and Deck-Shelves cards both need
-hardware confirmation; the local tests simulate their focus contracts.
+signals will stay silent. Native Home game focus has been reported working on Steam Deck. Deck-Shelves
+compatibility and other Steam client versions still require confirmation; local
+tests simulate their focus contracts.
 
 ## Local validation
 
@@ -119,8 +120,10 @@ declarations. The application source passes type checking with that flag.
 
 ## Steam Deck Gaming Mode test checklist
 
-Hardware validation has not been performed in the development environment.
-Record the Steam client channel/version, SteamOS version, and Decky version.
+Home previews and game-details playback have been reported working by the user
+on Steam Deck Gaming Mode. The development environment cannot run Steam Deck
+hardware tests; the checklist below covers additional scenarios and client
+configurations. Record the Steam client channel/version, SteamOS version, and Decky version.
 
 1. Install the experimental ZIP using Decky's developer **Install Plugin From Zip**
    flow. With existing settings, verify the new toggle is off. Open game details
@@ -232,4 +235,5 @@ several seconds on each. Confirm `lastAppId` records the selected game and audio
 switches. Reopen Quick Access and confirm audio stops, then close it and confirm
 a fresh debounce. Check that entering details and launching a game still stops
 the Home owner. The local suite simulates stale `/login` focus before a Home
-card in an `/index.html` main navigation tree; hardware confirmation is pending.
+card in an `/index.html` main navigation tree. The user subsequently reported
+Home playback working on their Steam Deck.

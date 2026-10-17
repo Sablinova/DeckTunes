@@ -27,6 +27,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify release version and notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node -e 'const fs = require("fs"); const version = require("./package.json").version; if ("v" + version !== process.env.RELEASE_TAG) throw new Error("Release tag must match package.json version"); fs.accessSync("docs/releases/" + process.env.RELEASE_TAG + ".md");'
+
+      - name: Test playback and backend behavior
+        run: |
+          pnpm test
+          pnpm run test:backend
+
+      - name: Check application types
+        run: pnpm exec tsc --noEmit --skipLibCheck
+
       - name: Build frontend
         run: pnpm run build
 
@@ -45,18 +59,24 @@ jobs:
           cp package.json "./DeckTunes/"
           cp LICENSE "./DeckTunes/"
           cp README.md "./DeckTunes/"
+          cp CHANGELOG.md "./DeckTunes/"
+          cp -r docs "./DeckTunes/"
           cp -r dist "./DeckTunes/"
           cp -r bin "./DeckTunes/"
           [ -d "assets" ] && cp -r assets "./DeckTunes/" || true
           [ -d "defaults" ] && cp -r defaults "./DeckTunes/" || true
           mkdir -p out
           zip -r out/DeckTunes.zip DeckTunes
+          cd out
+          sha256sum DeckTunes.zip > DeckTunes.zip.sha256
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: DeckTunes
-          path: out/DeckTunes.zip
+          path: |
+            out/DeckTunes.zip
+            out/DeckTunes.zip.sha256
 
   release:
     needs: build
@@ -72,7 +92,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          body_path: docs/releases/${{ github.ref_name }}.md
           files: |
             out/DeckTunes.zip
+            out/DeckTunes.zip.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
