@@ -15,6 +15,26 @@ type GameThemeMusicCache = {
 type GameThemeMusicCacheMapping = { [key: string]: GameThemeMusicCache }
 
 const cacheUpdates = new Map<number, Promise<GameThemeMusicCache | null>>()
+const themeRevisions = new Map<number, number>()
+let allThemesRevision = 0
+const themeListeners = new Set<(appId?: number) => void>()
+
+export function subscribeThemeChanges(listener: (appId?: number) => void) {
+  themeListeners.add(listener)
+  return () => {
+    themeListeners.delete(listener)
+  }
+}
+
+export function getThemeRevision(appId: number) {
+  return `${allThemesRevision}:${themeRevisions.get(appId) ?? 0}`
+}
+
+function notifyThemeChange(appId?: number) {
+  if (appId === undefined) ++allThemesRevision
+  else themeRevisions.set(appId, (themeRevisions.get(appId) ?? 0) + 1)
+  for (const listener of themeListeners) listener(appId)
+}
 
 export async function updateCache(
   appId: number,
@@ -29,10 +49,12 @@ export async function updateCache(
     .then(async () => {
       const oldCache = await getCache(appId)
       if (!shouldUpdate(oldCache)) return oldCache
-      return localforage.setItem(appId.toString(), {
+      const saved = await localforage.setItem(appId.toString(), {
         ...(oldCache || {}),
         ...newData
       })
+      if (saved.videoId !== oldCache?.videoId) notifyThemeChange(appId)
+      return saved
     })
   cacheUpdates.set(appId, pending)
   try {
@@ -59,10 +81,11 @@ export async function importCache(name: string) {
     'import_cache',
     name
   )
-  localforage.clear()
+  await localforage.clear()
   for (const [key, value] of Object.entries(newCache)) {
     await localforage.setItem(key, value)
   }
+  notifyThemeChange()
 }
 
 export async function listCacheBackups(): Promise<string[]> {
@@ -71,9 +94,11 @@ export async function listCacheBackups(): Promise<string[]> {
 
 export async function clearCache(appId?: number) {
   if (appId?.toString().length) {
-    localforage.removeItem(appId.toString())
+    await localforage.removeItem(appId.toString())
+    notifyThemeChange(appId)
   } else {
-    localforage.clear()
+    await localforage.clear()
+    notifyThemeChange()
     await call<[]>('clear_cache')
   }
 }

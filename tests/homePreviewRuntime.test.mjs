@@ -2,18 +2,17 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { loadTs, tsModuleUrl, moduleUrl, fakeClock, flush } from './loadTs.mjs'
 
-const { installHomeScreenMusicPreview } = await loadTs(
-  '../src/lib/homeScreenMusicPreview.ts',
-  {
-    '@decky/ui': moduleUrl(`
+const runtimeImports = {
+  '@decky/ui': moduleUrl(`
     export const Router = {
       get RunningApps() { return globalThis.homeRuntimeTest.runningApps ?? [] },
       get WindowStore() { return { GamepadUIMainWindowInstance: { BrowserWindow: globalThis.homeRuntimeTest.routerMain } } }
     };
     export const findSP = () => globalThis.homeRuntimeTest.win;
   `),
-    '../cache/musicCache': moduleUrl(
-      `export const getCache = (id) => globalThis.homeRuntimeTest.cache.get(id);
+  '../cache/musicCache': moduleUrl(
+    `export const getThemeRevision = (id) => String(globalThis.homeRuntimeTest.cache.get(id)?.videoId);
+       export const getCache = (id) => globalThis.homeRuntimeTest.cache.get(id);
        export const updateCache = async (id, value, shouldUpdate) => {
          const data = globalThis.homeRuntimeTest;
          if (!shouldUpdate(data.cache.get(id))) return data.cache.get(id);
@@ -21,8 +20,8 @@ const { installHomeScreenMusicPreview } = await loadTs(
          data.cache.set(id, {...data.cache.get(id), ...value});
          return data.cache.get(id);
        };`
-    ),
-    '../actions/audio': moduleUrl(`
+  ),
+  '../actions/audio': moduleUrl(`
     export const getResolver = (useYtDlp) => {
       globalThis.homeRuntimeTest.backends.push(useYtDlp);
       return { getAudioUrlFromVideo: async ({id}) => {
@@ -36,17 +35,23 @@ const { installHomeScreenMusicPreview } = await loadTs(
       } };
     };
   `),
-    './homeFocus': tsModuleUrl('../src/lib/homeFocus.ts'),
-    './steamHomeWindow': tsModuleUrl('../src/lib/steamHomeWindow.ts', {
-      './homeFocus': tsModuleUrl('../src/lib/homeFocus.ts')
-    }),
-    './homePreviewDiagnostics': moduleUrl(
-      'export const updateHomePreviewDiagnostics = (patch) => Object.assign(globalThis.homeRuntimeTest.diagnostics, patch)'
-    ),
-    './homePreviewController': tsModuleUrl(
-      '../src/lib/homePreviewController.ts'
-    )
-  }
+  './homeFocus': tsModuleUrl('../src/lib/homeFocus.ts'),
+  './steamHomeWindow': tsModuleUrl('../src/lib/steamHomeWindow.ts', {
+    './homeFocus': tsModuleUrl('../src/lib/homeFocus.ts')
+  }),
+  './homePreviewDiagnostics': moduleUrl(
+    'export const updateHomePreviewDiagnostics = (patch) => Object.assign(globalThis.homeRuntimeTest.diagnostics, patch)'
+  ),
+  './homePreviewController': tsModuleUrl('../src/lib/homePreviewController.ts')
+}
+const themeModule = tsModuleUrl('../src/lib/gameTheme.ts', {
+  '../cache/musicCache': runtimeImports['../cache/musicCache'],
+  '../actions/audio': runtimeImports['../actions/audio']
+})
+const { resolveGameTheme } = await import(themeModule)
+const { installHomeScreenMusicPreview } = await loadTs(
+  '../src/lib/homeScreenMusicPreview.ts',
+  { ...runtimeImports, './gameTheme': themeModule }
 )
 
 function fixture(
@@ -428,4 +433,83 @@ test('cleanup disconnects observers, clears the interval and ignores subsequent 
   await f.clock.tick(1000)
   await flush()
   assert.equal(f.data.audios.length, 1)
+})
+
+test('Home discovery saves the exact video reused by details without another search', async (t) => {
+  const f = fixture(t, [])
+  await f.clock.tick(500)
+  const selected = f.data.cache.get(570).videoId
+  const detail = await resolveGameTheme(570, 'Dota 2', {
+    useYtDlp: true,
+    defaultMuted: false,
+    volume: 0.7
+  })
+  assert.equal(detail.videoId, selected)
+  assert.equal(detail.audioUrl, 'http://localhost/audio/' + selected)
+  assert.deepEqual(f.data.searched, ['Dota 2'])
+  f.reconcile()
+  await f.clock.tick(1000)
+  assert.equal(
+    f.data.audios.length,
+    1,
+    'saving a discovered theme must not restart its preview'
+  )
+})
+
+test('a manually applied song is used by details and an already-focused Home card', async (t) => {
+  const f = fixture(t)
+  await f.clock.tick(500)
+  f.data.cache.set(570, { videoId: 'manual-choice' })
+  const detail = await resolveGameTheme(570, 'Dota 2', {
+    useYtDlp: true,
+    defaultMuted: false,
+    volume: 0.7
+  })
+  f.reconcile()
+  assert.equal(f.data.audios[0].paused, true)
+  await f.clock.tick(500)
+  assert.equal(f.data.audios[1].src, detail.audioUrl)
+  assert.equal(detail.videoId, 'manual-choice')
+  assert.deepEqual(f.data.searched, [])
+})
+
+test('No Music applied to a playing game silences both views without searching', async (t) => {
+  const f = fixture(t)
+  await f.clock.tick(500)
+  f.data.cache.set(570, { videoId: '' })
+  f.reconcile()
+  assert.equal(f.data.audios[0].paused, true)
+  await f.clock.tick(500)
+  assert.equal(
+    await resolveGameTheme(570, 'Dota 2', {
+      useYtDlp: true,
+      defaultMuted: false,
+      volume: 0.7
+    }),
+    undefined
+  )
+  assert.equal(f.data.audios.length, 1)
+  assert.deepEqual(f.data.searched, [])
+})
+
+test('details discovery cannot overwrite or play a manual choice made while searching', async (t) => {
+  const f = fixture(t, [])
+  let finish
+  f.data.search = () =>
+    new Promise((resolve) => {
+      finish = resolve
+    })
+  const pending = resolveGameTheme(570, 'Dota 2', {
+    useYtDlp: true,
+    defaultMuted: false,
+    volume: 0.7
+  })
+  await flush()
+  f.data.cache.set(570, { videoId: 'manual-choice', volume: 0.3 })
+  finish({ videoId: 'late-automatic', audioUrl: 'wrong-song' })
+  const detail = await pending
+  assert.equal(detail.videoId, 'manual-choice')
+  assert.equal(detail.audioUrl, 'http://localhost/audio/manual-choice')
+  assert.equal(detail.volume, 0.3)
+  assert.deepEqual(f.data.writes, [])
 })

@@ -36,6 +36,8 @@
     "invidiousInstance": "Invidious Instance",
     "invidiousInstanceDescription": "Which Invidious instance would you like to use for searching and getting audio?",
     "noMusicLabel": "No Music",
+    "musicSearchFailed": "Music search failed. No Music is a manual choice; this error has not changed your saved theme.",
+    "retryMusicSearch": "Retry search",
     "overrides": "Overrides",
     "play": "Play",
     "reset": "Reset",

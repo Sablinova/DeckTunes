@@ -118,38 +118,35 @@ class InvidiousAudioResolver extends AudioResolver {
   }
 }
 
-// search_yt / next_yt_result share one backend cursor. Keep each iterator's
-// reads together so Home, details, and manual searches cannot mix results.
-let ytSearchQueue = Promise.resolve()
-
 class YtDlpAudioResolver extends AudioResolver {
   async *getYouTubeSearchResults(
     searchTerm: string,
     isCurrent: () => boolean = () => true
   ): AsyncIterable<YouTubeVideoPreview> {
-    const previousSearch = ytSearchQueue
-    let release!: () => void
-    ytSearchQueue = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    await previousSearch
     try {
-      // Focus may have changed while this search waited for the backend.
       if (!isCurrent()) return
-      await call<[string]>('search_yt', searchTerm)
+      const searchId = await call<[string], number | undefined>(
+        'search_yt',
+        searchTerm
+      )
       if (!isCurrent()) return
-      let result = await call<[], YouTubeVideoPreview | null>('next_yt_result')
+      const next = () =>
+        searchId === undefined
+          ? call<[], YouTubeVideoPreview | null>('next_yt_result')
+          : call<[number], YouTubeVideoPreview | null>(
+              'next_yt_result',
+              searchId
+            )
+      let result = await next()
       while (result) {
         if (!isCurrent()) return
         yield result
         if (!isCurrent()) return
-        result = await call<[], YouTubeVideoPreview | null>('next_yt_result')
+        result = await next()
       }
       return
     } catch (err) {
-      console.error(err)
-    } finally {
-      release()
+      if (isCurrent()) throw err
     }
     return
   }
@@ -189,9 +186,41 @@ class YtDlpAudioResolver extends AudioResolver {
   }
 }
 
-export function getResolver(useYtDlp: boolean): AudioResolver {
+// Automatic theme discovery must never hold up manual search results.
+// Home and details share selections; only background discoveries queue here.
+let discoverySearchQueue = Promise.resolve()
+class DiscoveryYtDlpAudioResolver extends YtDlpAudioResolver {
+  async *getYouTubeSearchResults(
+    searchTerm: string,
+    isCurrent: () => boolean = () => true
+  ): AsyncIterable<YouTubeVideoPreview> {
+    const previous = discoverySearchQueue
+    let release!: () => void
+    discoverySearchQueue = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previous
+    try {
+      if (!isCurrent()) return
+      const video = await call<[string], YouTubeVideoPreview | null>(
+        'search_home_yt',
+        searchTerm
+      )
+      if (video && isCurrent()) yield video
+    } finally {
+      release()
+    }
+  }
+}
+
+export function getResolver(
+  useYtDlp: boolean,
+  automaticDiscovery = false
+): AudioResolver {
   if (useYtDlp) {
-    return new YtDlpAudioResolver()
+    return automaticDiscovery
+      ? new DiscoveryYtDlpAudioResolver()
+      : new YtDlpAudioResolver()
   } else {
     return new InvidiousAudioResolver()
   }

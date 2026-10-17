@@ -1,61 +1,51 @@
-import { useEffect, useState } from 'react'
-
-import { getResolver } from '../actions/audio'
-
-import { getCache, updateCache } from '../cache/musicCache'
-import { useSettings } from '../hooks/useSettings'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { getThemeRevision, subscribeThemeChanges } from '../cache/musicCache'
+import { resolveGameTheme } from '../lib/gameTheme'
+import { useSettings } from './useSettings'
 
 const useThemeMusic = (appId: number) => {
   const { settings, isLoading: settingsLoading } = useSettings()
-  const [audio, setAudio] = useState<{ videoId: string; audioUrl: string }>({
-    videoId: '',
-    audioUrl: ''
-  })
-  const appDetails = appStore.GetAppOverviewByGameID(appId)
-  const appName = appDetails?.display_name?.replace(/(™|®|©)/g, '')
+  const [audio, setAudio] = useState({ videoId: '', audioUrl: '' })
+  const [isLoading, setIsLoading] = useState(true)
+  const appName = appStore.GetAppOverviewByGameID(appId)?.display_name
+  const revision = useSyncExternalStore(
+    (listener) =>
+      subscribeThemeChanges((changed) => {
+        if (changed === undefined || changed === appId) listener()
+      }),
+    () => getThemeRevision(appId)
+  )
 
   useEffect(() => {
     let ignore = false
-    async function getData() {
-      const resolver = getResolver(settings.useYtDlp)
-      const cache = await getCache(appId)
-      if (cache?.videoId?.length == 0) {
-        return setAudio({ videoId: '', audioUrl: '' })
-      } else if (cache?.videoId?.length) {
-        const newAudio = await resolver.getAudioUrlFromVideo({
-          id: cache.videoId
+    setAudio({ videoId: '', audioUrl: '' })
+    setIsLoading(true)
+    if (!settingsLoading) {
+      resolveGameTheme(appId, appName, settings, () => !ignore)
+        .then((theme) => {
+          if (!ignore) setAudio(theme ?? { videoId: '', audioUrl: '' })
         })
-        if (newAudio?.length) {
-          return setAudio({ videoId: cache.videoId, audioUrl: newAudio })
-        }
-      } else if (settings.defaultMuted) {
-        return setAudio({ videoId: '', audioUrl: '' })
-      } else {
-        const newAudio = await resolver.getAudio(
-          appName as string,
-          () => !ignore
-        )
-        if (ignore) {
-          return
-        }
-        if (!newAudio?.audioUrl?.length) {
-          return setAudio({ videoId: '', audioUrl: '' })
-        }
-        await updateCache(appId, newAudio)
-        return setAudio(newAudio)
-      }
-    }
-    if (appName?.length && !settingsLoading) {
-      getData()
+        .catch((error) => {
+          if (!ignore)
+            console.error('[DeckTunes] Theme resolution failed:', error)
+        })
+        .finally(() => {
+          if (!ignore) setIsLoading(false)
+        })
     }
     return () => {
       ignore = true
     }
-  }, [appName, settingsLoading])
+  }, [
+    appId,
+    appName,
+    settingsLoading,
+    settings.useYtDlp,
+    settings.defaultMuted,
+    revision
+  ])
 
-  return {
-    audio
-  }
+  return { audio, isLoading }
 }
 
 export default useThemeMusic

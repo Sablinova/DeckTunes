@@ -1,6 +1,6 @@
 import { findSP, Router } from '@decky/ui'
-import { getCache, updateCache } from '../cache/musicCache'
-import { getResolver } from '../actions/audio'
+import { getThemeRevision } from '../cache/musicCache'
+import { resolveGameTheme } from './gameTheme'
 import { Settings } from '../hooks/useSettings'
 import { AudioLoaderCompatState } from '../state/AudioLoaderCompatState'
 import { inspectHomeFocus } from './homeFocus'
@@ -33,73 +33,15 @@ export function installHomeScreenMusicPreview(
       report({ runtime: doc ? 'Running' : 'Steam UI window not found' })
       return focus?.appId ?? null
     },
-    resolve: async (appId, isCurrent) => {
-      const cache = await getCache(appId)
-      // An empty videoId is the existing per-game "No Music" override.
-      if (!isCurrent()) return undefined
-      if (cache?.videoId === '') {
-        report({ lastResult: `App ${appId}: No Music is selected` })
-        return undefined
-      }
-      const resolver = getResolver(settings.useYtDlp)
-      let audioUrl: string | undefined
-      let volume = cache?.volume
-      if (cache?.videoId) {
-        report({ lastResult: `App ${appId}: resolving saved theme` })
-        audioUrl = await resolver.getAudioUrlFromVideo({ id: cache.videoId })
-      } else {
-        // Match game-details behavior: Default Muted permits saved themes but
-        // prevents discovering new themes until the user selects one manually.
-        if (settings.defaultMuted) {
-          report({
-            lastResult: `App ${appId}: Default Muted prevents theme search`
-          })
-          return undefined
-        }
-        const appName = appStore
-          .GetAppOverviewByGameID(appId)
-          ?.display_name?.replace(/(™|®|©)/g, '')
-          .trim()
-        if (!appName) {
-          report({ lastResult: `App ${appId}: game name is unavailable` })
-          return undefined
-        }
-        report({ lastResult: `Searching: ${appName}` })
-        const theme = await resolver.getAudio(appName, isCurrent)
-        if (!isCurrent()) return undefined
-        if (!theme?.videoId || !theme.audioUrl) {
-          report({
-            lastResult: `App ${appId}: search returned no playable theme`
-          })
-          return undefined
-        }
-
-        // A manual selection or No Music override made during a slow search
-        // takes precedence over its automatic result.
-        const saved = await updateCache(
-          appId,
-          { videoId: theme.videoId },
-          (current) => isCurrent() && current?.videoId === undefined
-        )
-        if (!isCurrent() || saved?.videoId !== theme.videoId) return undefined
-        volume = saved.volume
-        audioUrl = theme.audioUrl
-      }
-      if (!audioUrl) {
-        if (isCurrent())
-          report({
-            lastResult: `App ${appId}: saved theme has no playable audio URL`
-          })
-        return undefined
-      }
-      return {
-        audioUrl,
-        volume:
-          typeof volume === 'number' && Number.isFinite(volume)
-            ? volume
-            : settings.volume
-      }
-    },
+    getThemeRevision,
+    resolve: (appId, isCurrent) =>
+      resolveGameTheme(
+        appId,
+        appStore.GetAppOverviewByGameID(appId)?.display_name,
+        settings,
+        isCurrent,
+        (lastResult) => report({ lastResult })
+      ),
     createAudio: () => {
       const AudioConstructor = doc?.defaultView?.Audio ?? Audio
       return new AudioConstructor()

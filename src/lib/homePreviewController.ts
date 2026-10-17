@@ -12,6 +12,7 @@ type PreviewAudio = Pick<
 
 export interface HomePreviewDependencies {
   getFocusedAppId(): number | null
+  getThemeRevision?(appId: number): string
   resolve(
     appId: number,
     isCurrent: () => boolean
@@ -25,6 +26,7 @@ export interface HomePreviewDependencies {
 // Owns only home audio. Page players retain their existing playback behavior.
 export class HomePreviewController {
   private target: number | null = null
+  private revision: string | undefined
   private generation = 0
   private timer: ReturnType<typeof setTimeout> | undefined
   private audio: PreviewAudio | undefined
@@ -35,9 +37,12 @@ export class HomePreviewController {
   update = () => {
     if (this.disposed) return
     const appId = this.deps.getFocusedAppId()
-    if (appId === this.target) return
+    const revision =
+      appId === null ? undefined : this.deps.getThemeRevision?.(appId)
+    if (appId === this.target && revision === this.revision) return
 
     this.target = appId
+    this.revision = revision
     const generation = ++this.generation
     clearTimeout(this.timer)
     this.stopAudio()
@@ -71,7 +76,10 @@ export class HomePreviewController {
       const theme = await this.deps.resolve(appId, () =>
         this.isCurrent(appId, generation)
       )
-      if (!theme?.audioUrl || !this.isCurrent(appId, generation)) return
+      if (!this.isCurrent(appId, generation)) return
+      // Our own automatic discovery may have saved the shared selection.
+      this.revision = this.deps.getThemeRevision?.(appId)
+      if (!theme?.audioUrl) return
 
       const audio = this.deps.createAudio()
       this.audio = audio

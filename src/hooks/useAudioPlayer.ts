@@ -32,9 +32,14 @@ const useAudioPlayer = (
   const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
+    stop()
+    setIsReady(false)
     if (audioUrl?.length) {
       audioPlayer.src = audioUrl
       audioPlayer.loop = true
+    } else {
+      audioPlayer.removeAttribute('src')
+      audioPlayer.load()
     }
   }, [audioUrl])
 

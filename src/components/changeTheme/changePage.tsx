@@ -24,7 +24,9 @@ export default function ChangePage({
   setInitialSearch,
   handlePlay,
   loading,
-  videos
+  videos,
+  searchError,
+  retrySearch
 }: {
   videos: (YouTubeVideoPreview & { isPlaying: boolean })[]
   loading: boolean
@@ -32,6 +34,8 @@ export default function ChangePage({
   customSearch: (term: string) => void
   setInitialSearch: () => string
   currentSearch: string
+  searchError: string
+  retrySearch: () => void
 }) {
   const t = useTranslations()
   const { settings } = useSettings()
@@ -54,7 +58,7 @@ export default function ChangePage({
     videoId: string
     audioUrl: string
   }) {
-    if (settings.downloadAudio) {
+    if (settings.downloadAudio && audio.videoId) {
       const success = await getResolver(settings.useYtDlp).downloadAudio({
         id: audio.videoId,
         url: audio.audioUrl
@@ -68,8 +72,8 @@ export default function ChangePage({
         return
       }
     }
+    await updateCache(parseInt(appid), { videoId: audio.videoId })
     setSelected(audio.videoId)
-    updateCache(parseInt(appid), { videoId: audio.videoId })
   }
 
   return (
@@ -118,6 +122,24 @@ export default function ChangePage({
           </Focusable>
         </PanelSectionRow>
       </PanelSection>
+      {searchError && (
+        <PanelSection>
+          <PanelSectionRow>
+            <div
+              role="alert"
+              style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+            >
+              <strong>{t('musicSearchFailed')}</strong>
+              <p>{searchError}</p>
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <DialogButton onClick={retrySearch} disabled={loading}>
+              {t('retryMusicSearch')}
+            </DialogButton>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
       {loading && videos?.length === 0 ? (
         <SteamSpinner />
       ) : (

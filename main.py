@@ -11,6 +11,7 @@ import certifi
 import logging
 import platform
 import shutil
+import tempfile
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from functools import partial
 
@@ -23,7 +24,21 @@ logger = logging.getLogger(__name__)
 
 def get_ytdlp_path() -> str:
     binary = "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp"
+    persistent = os.path.join(decky.DECKY_PLUGIN_RUNTIME_DIR, "bin", binary)
+    if os.path.isfile(persistent):
+        return persistent
     return os.path.join(decky.DECKY_PLUGIN_DIR, "bin", binary)
+
+
+def preserve_ytdlp_binary() -> str:
+    """Keep in-app updates outside the directory replaced by ZIP installs."""
+    binary = "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp"
+    target = os.path.join(decky.DECKY_PLUGIN_RUNTIME_DIR, "bin", binary)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    if not os.path.isfile(target):
+        shutil.copy2(get_ytdlp_path(), target)
+        os.chmod(target, 0o755)
+    return target
 
 
 class AudioHTTPRequestHandler(SimpleHTTPRequestHandler):
@@ -59,6 +74,11 @@ class AudioHTTPRequestHandler(SimpleHTTPRequestHandler):
 class Plugin:
     yt_process: asyncio.subprocess.Process | None = None
     yt_process_lock = asyncio.Lock()
+    yt_start_lock = asyncio.Lock()
+    yt_search_id = 0
+    yt_stderr_task = None
+    home_search_lock = asyncio.Lock()
+    home_yt_process: asyncio.subprocess.Process | None = None
     music_path = f"{decky.DECKY_PLUGIN_RUNTIME_DIR}/music"
     cache_path = f"{decky.DECKY_PLUGIN_RUNTIME_DIR}/cache"
     ssl_context = ssl.create_default_context(cafile=certifi.where())
@@ -165,6 +185,10 @@ class Plugin:
             name="config", settings_directory=decky.DECKY_PLUGIN_SETTINGS_DIR
         )
         logger.info("Settings loaded.")
+        try:
+            preserve_ytdlp_binary()
+        except OSError as error:
+            logger.warning(f"Could not preserve yt-dlp; using bundled copy: {error}")
 
         # Migrate old SDH-GameThemeMusic settings if they exist
         await self._migrate_old_settings()
@@ -182,16 +206,12 @@ class Plugin:
             self.http_server = None
             logger.info("Audio server stopped")
 
-        # Terminate yt-dlp process if running
-        if self.yt_process is not None and self.yt_process.returncode is None:
-            logger.info("Terminating yt_process...")
-            self.yt_process.terminate()
-            async with self.yt_process_lock:
-                try:
-                    await asyncio.wait_for(self.yt_process.communicate(), timeout=5)
-                except TimeoutError:
-                    logger.warning("yt_process timeout. Killing process.")
-                    self.yt_process.kill()
+        # Readers already drain stderr; communicate() would read it concurrently.
+        for process in (self.yt_process, self.home_yt_process):
+            if process is not None:
+                await self._stop_search(process)
+        if self.yt_stderr_task is not None:
+            await self.yt_stderr_task
 
         logger.info("DeckTunes unloaded successfully")
 
@@ -209,19 +229,12 @@ class Plugin:
         logger.info(f"Retrieved config key: {key} = {value}")
         return value
 
-    async def search_yt(self, term: str):
-        logger.info(f"Searching YouTube for: {term}")
+    async def _create_yt_search(self, term: str, stderr):
         ytdlp_path = get_ytdlp_path()
         if os.path.exists(ytdlp_path):
             os.chmod(ytdlp_path, 0o755)
 
-        if self.yt_process is not None and self.yt_process.returncode is None:
-            logger.info("Terminating previous yt_process...")
-            self.yt_process.terminate()
-            async with self.yt_process_lock:
-                await self.yt_process.communicate()
-
-        self.yt_process = await asyncio.create_subprocess_exec(
+        return await asyncio.create_subprocess_exec(
             ytdlp_path,
             f"ytsearch10:{term}",
             "-j",
@@ -230,23 +243,92 @@ class Plugin:
             "--match-filters",
             f"duration<?{20 * 60}",
             stdout=asyncio.subprocess.PIPE,
+            stderr=stderr,
             limit=10 * 1024**2,
             env={**os.environ, "LD_LIBRARY_PATH": "/usr/lib:/lib"},
         )
-        logger.info("yt-dlp search process started.")
 
-    async def next_yt_result(self):
+    async def _read_search_stderr(self, process):
+        tail = b""
+        while chunk := await process.stderr.read(4096):
+            tail = (tail + chunk)[-4096:]
+        return tail.decode(errors="replace").strip()
+
+    async def _stop_search(self, process):
+        if process.returncode is None:
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5)
+        except TimeoutError:
+            process.kill()
+            await process.wait()
+
+    async def search_yt(self, term: str):
+        logger.info(f"Searching YouTube for: {term}")
+        async with self.yt_start_lock:
+            if self.yt_process is not None:
+                # Termination releases any pending readline before taking its lock.
+                await self._stop_search(self.yt_process)
+            async with self.yt_process_lock:
+                self.yt_process = await self._create_yt_search(
+                    term, asyncio.subprocess.PIPE
+                )
+                self.yt_stderr_task = asyncio.create_task(
+                    self._read_search_stderr(self.yt_process)
+                )
+                self.yt_search_id += 1
+                return self.yt_search_id
+
+    async def next_yt_result(self, search_id=None):
         async with self.yt_process_lock:
-            if (
-                not self.yt_process
-                or not (output := self.yt_process.stdout)
-                or not (line := (await output.readline()).strip())
-            ):
-                logger.info("No more results from yt_process.")
+            if search_id is not None and search_id != self.yt_search_id:
+                return None
+            process = self.yt_process
+            stderr_task = self.yt_stderr_task
+            if not process or not process.stdout:
+                return None
+            try:
+                line = (await asyncio.wait_for(
+                    process.stdout.readline(), timeout=45
+                )).strip()
+            except TimeoutError:
+                await self._stop_search(process)
+                raise RuntimeError("yt-dlp search timed out after 45 seconds")
+            if not line:
+                await process.wait()
+                error = await stderr_task if stderr_task else ""
+                if process.returncode:
+                    raise RuntimeError(error or f"yt-dlp exited with code {process.returncode}")
                 return None
             logger.debug(f"Received result line: {line[:100]}...")
             entry = json.loads(line)
             return self.entry_to_info(entry)
+
+    async def search_home_yt(self, term: str):
+        """Home discovery never uses the details/manual-search process or cursor."""
+        async with self.home_search_lock:
+            with tempfile.TemporaryFile() as errors:
+                process = await self._create_yt_search(term, errors)
+                self.home_yt_process = process
+                try:
+                    line = await asyncio.wait_for(process.stdout.readline(), timeout=45)
+                    if line.strip():
+                        return self.entry_to_info(json.loads(line))
+                    await process.wait()
+                    errors.seek(0)
+                    error = errors.read()[-4096:].decode(errors="replace").strip()
+                    if process.returncode:
+                        raise RuntimeError(error or f"yt-dlp exited with code {process.returncode}")
+                    return None
+                except TimeoutError:
+                    raise RuntimeError("Home theme search timed out after 45 seconds")
+                finally:
+                    await self._stop_search(process)
+                    if self.home_yt_process is process:
+                        self.home_yt_process = None
 
     @staticmethod
     def entry_to_info(entry):
@@ -494,6 +576,9 @@ class Plugin:
         temp_path = ytdlp_path + ".tmp"
 
         try:
+            ytdlp_path = preserve_ytdlp_binary()
+            backup_path = ytdlp_path + ".backup"
+            temp_path = ytdlp_path + ".tmp"
             # Backup current binary
             if os.path.exists(ytdlp_path):
                 logger.info(f"Backing up current yt-dlp to {backup_path}")

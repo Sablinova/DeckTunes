@@ -21,6 +21,8 @@ export default function ChangeTheme() {
     (YouTubeVideoPreview & { isPlaying: boolean })[]
   >([])
   const [loadingNum, setLoadingNum] = useState(0)
+  const [searchError, setSearchError] = useState('')
+  const [searchAttempt, setSearchAttempt] = useState(0)
   const initialSearch = appName?.concat(' Theme Music') ?? ''
   const [searchTerm, setSearchTerm] = useState(initialSearch)
   useEffect(() => {
@@ -28,6 +30,7 @@ export default function ChangeTheme() {
     async function getData() {
       setLoadingNum((x) => x + 1)
       setVideos([])
+      setSearchError('')
       try {
         const resolver = getResolver(settings.useYtDlp)
         const res = resolver.getYouTubeSearchResults(searchTerm, () => !ignore)
@@ -42,6 +45,7 @@ export default function ChangeTheme() {
         }
       } catch (e) {
         console.error('Error fetching YouTube results:', e)
+        if (!ignore) setSearchError(e instanceof Error ? e.message : String(e))
       }
       setLoadingNum((x) => x - 1)
     }
@@ -51,7 +55,7 @@ export default function ChangeTheme() {
     return () => {
       ignore = true
     }
-  }, [searchTerm, settingsLoading])
+  }, [searchTerm, settingsLoading, searchAttempt, settings.useYtDlp])
 
   function handlePlay(index: number, startPlay: boolean) {
     setVideos((oldVideos) => {
@@ -86,6 +90,8 @@ export default function ChangeTheme() {
               <ChangePage
                 videos={videos}
                 loading={loadingNum > 0}
+                searchError={searchError}
+                retrySearch={() => setSearchAttempt((attempt) => attempt + 1)}
                 handlePlay={handlePlay}
                 customSearch={setSearchTerm}
                 currentSearch={searchTerm}

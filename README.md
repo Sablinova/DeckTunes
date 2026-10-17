@@ -79,7 +79,9 @@
 ### yt-dlp
 - **Current Version** - Shows installed yt-dlp version
 - **Latest Version** - Shows latest available version
-- **Update Button** - Appears when an update is available
+- **Update Button** - Appears when an update is available. Update yt-dlp directly
+  in Decky without reinstalling DeckTunes. Updates are stored in Decky runtime
+  data and retained when installing a new plugin ZIP that preserves that data.
 
 ## 🤝 Compatibility
 

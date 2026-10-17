@@ -23,10 +23,17 @@ Search failures and missing game names remain silent without writing a cache ent
 The saved per-game volume takes priority over the global volume, including a
 per-game volume of zero.
 
-Automatic and manual yt-dlp searches share a queue because the existing backend
-has a single search cursor. This keeps game results separate. Obsolete queued
-searches are skipped; in-flight requests may finish, but cancelled results cannot
-start playback or save a selection. A manual theme or No Music selection made
+Home, details, and game settings use one theme-resolution function and the same
+AppID cache entry. Applying a song or No Music changes all three views; mounted
+views observe selection changes, and an already-focused Home card refreshes its
+preview. Automatic discovery only fills a missing selection and cannot overwrite
+a manual choice. A losing discovery resolves the winning saved song instead.
+
+Automatic discovery uses a separate yt-dlp subprocess from manual search. Only
+background discoveries queue together; a slow automatic search cannot hold up
+Change Theme Music. Manual searches replace older searches and use generation tokens so old
+iterators cannot consume new results. Obsolete discovery requests are skipped, and
+cancelled results cannot start playback or save a selection. A manual theme or No Music selection made
 during discovery takes precedence over the automatic result.
 
 Changing focus immediately releases the previous audio. Leaving Home, hiding the
@@ -87,12 +94,13 @@ hardware confirmation; the local tests simulate their focus contracts.
 ```sh
 pnpm install --frozen-lockfile
 pnpm test
+pnpm run test:backend
 pnpm exec tsc --noEmit --skipLibCheck
 pnpm run build
 ```
 
 The tests cover debounce, rapid navigation, repeated focus, automatic discovery,
-cache reuse, Default Muted, No Music, shared yt-dlp search serialization,
+cache reuse, Default Muted, No Music, isolated Home searches, manual search generation tokens,
 per-game/global volume, stale resolver responses, page/launch inhibition,
 AudioLoader ownership, live settings migration/updates, media errors, and cleanup.
 Tests use Node's test runner and the already-installed TypeScript transpiler.
@@ -134,7 +142,9 @@ Record the Steam client channel/version, SteamOS version, and Decky version.
    Confirm only the existing details player plays, with no overlapping Home
    audio. Repeat before the debounce expires and while the resolver is slow.
    Start an uncached Home search and then open Change Theme Music: verify each
-   search shows results for its own game. Switch cards during a search and verify
+   search shows results for its own game. Apply a new song and confirm both
+   details and Home reuse that exact selection without another search. Apply
+   No Music and confirm both views stop; repeat with Download Audio enabled. Switch cards during a search and verify
    the old result neither plays nor changes the old game's selection. Select No
    Music manually while a search is in flight and confirm it remains selected.
 8. Launch a game while previewing or resolving. Confirm playback stops on the
@@ -158,7 +168,7 @@ Record the Steam client channel/version, SteamOS version, and Decky version.
 After installing the updated ZIP, enable the preview, close Quick Access, and
 focus a game that plays correctly on its details page. Wait several seconds, then
 open DeckTunes and choose **Home Preview Diagnostics → Show preview status**.
-The report identifies build `home-preview-focus-v3` and retains the last playback
+The report identifies build `home-preview-shared-theme-v5` and retains the last playback
 result and attempted AppID even when opening Quick Access changes current focus.
 
 - `runtime: Not started`: the global preview component has not mounted.
@@ -180,3 +190,27 @@ Capture that report for further debugging. Current QAM focus can report no game;
 focus does not erase the observations made while selecting Home cards.
 The original cached-only build did not have this diagnostic panel. A successful
 build or local mock test does not establish on-device compatibility.
+
+## yt-dlp updates and search errors
+
+The existing DeckTunes **Check for Updates / Update yt-dlp** controls remain
+available inside Decky. The active binary lives in
+`DECKY_PLUGIN_RUNTIME_DIR/bin/yt-dlp`, alongside the existing persistent music
+data. Startup seeds that directory from the bundled binary only if it is missing.
+Installing another plugin ZIP does not overwrite an existing persistent update.
+Future yt-dlp releases can still be installed using the same settings controls;
+a new plugin ZIP is not required. This persistence applies to plugin updates
+that retain Decky's runtime data.
+
+The bundled fallback is pinned to 2026.08.19. This backend change requires a full
+plugin ZIP installation and reload. First leave Home Screen Music Preview off
+and verify normal details playback and Change Theme Music. yt-dlp failures now
+show the actual backend error and a retry button rather than silently looking
+like an empty result set. No Music remains an explicit manual selection.
+If search still fails on hardware, capture the complete displayed error.
+
+To verify update persistence, record Current Version, use Update yt-dlp when a
+new release is available, reinstall a plugin ZIP while retaining runtime data,
+and verify the updated Current Version is retained and Check for Updates still
+works. Backend tests exercise the existing update action writing to persistent
+storage, ZIP reinstall behavior, error propagation, search isolation, and unload.

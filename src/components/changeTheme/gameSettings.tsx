@@ -8,7 +8,7 @@ import {
 import { useEffect, useState } from 'react'
 import { getCache, updateCache } from '../../cache/musicCache'
 
-import { getResolver } from '../../actions/audio'
+import useThemeMusic from '../../hooks/useThemeMusic'
 import useTranslations from '../../hooks/useTranslations'
 import { useSettings } from '../../hooks/useSettings'
 import { FaVolumeUp } from 'react-icons/fa'
@@ -22,31 +22,21 @@ export default function GameSettings() {
   const appDetails = appStore.GetAppOverviewByGameID(parseInt(appid))
   const appName = appDetails?.display_name
 
-  const [currentAudio, setCurrentAudio] = useState<string>()
+  const { audio, isLoading: themeLoading } = useThemeMusic(parseInt(appid))
   const [themeVolume, setThemeVolume] = useState(settings.volume)
   const [loading, setLoading] = useState(true)
 
-  const audioPlayer = useAudioPlayer(currentAudio)
+  const audioPlayer = useAudioPlayer(audio.audioUrl)
 
   useEffect(() => {
     async function getData() {
       setLoading(true)
       try {
-        const resolver = getResolver(settings.useYtDlp)
         const cache = await getCache(parseInt(appid))
         if (typeof cache?.volume === 'number' && isFinite(cache.volume)) {
           setThemeVolume(cache.volume)
         } else {
           setThemeVolume(settings.volume)
-        }
-        if (cache?.videoId?.length) {
-          const newAudio = await resolver.getAudioUrlFromVideo({
-            id: cache?.videoId
-          })
-          setCurrentAudio(newAudio)
-        } else {
-          const newAudio = await resolver.getAudio(appName as string)
-          setCurrentAudio(newAudio?.audioUrl)
         }
       } catch (e) {
         console.error('Error loading game audio:', e)
@@ -99,11 +89,11 @@ export default function GameSettings() {
         </div>
         <DialogButton
           onClick={audioPlayer.togglePlay}
-          disabled={loading}
-          focusable={!loading}
+          disabled={loading || themeLoading}
+          focusable={!loading && !themeLoading}
           style={{ height: 'max-content' }}
         >
-          {loading ? (
+          {loading || themeLoading ? (
             <Spinner />
           ) : audioPlayer.isPlaying ? (
             t('stop')

@@ -2,14 +2,17 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { loadTs, moduleUrl, flush } from './loadTs.mjs'
 
-const { updateCache } = await loadTs('../src/cache/musicCache.ts', {
-  '@decky/api': moduleUrl('export const call = () => {}'),
-  localforage: moduleUrl(`export default {
+const { updateCache, subscribeThemeChanges, getThemeRevision } = await loadTs(
+  '../src/cache/musicCache.ts',
+  {
+    '@decky/api': moduleUrl('export const call = () => {}'),
+    localforage: moduleUrl(`export default {
     config() {},
     getItem: (id) => globalThis.musicCacheTest.get(id),
     setItem: (id, value) => globalThis.musicCacheTest.set(id, value)
   }`)
-})
+  }
+)
 
 function fixture(t) {
   const cache = new Map()
@@ -72,4 +75,22 @@ test('focus cancellation is checked after the asynchronous cache read and before
   finish(null)
   assert.equal(await automatic, null)
   assert.equal(cache.size, 0)
+})
+
+test('shared theme subscribers update for song/No Music changes, but not volume-only edits', async (t) => {
+  fixture(t)
+  const changes = []
+  const unsubscribe = subscribeThemeChanges((id) => changes.push(id))
+  t.after(unsubscribe)
+  const initial = getThemeRevision(570)
+  await updateCache(570, { videoId: 'song' })
+  assert.notEqual(getThemeRevision(570), initial)
+  const selected = getThemeRevision(570)
+  await updateCache(570, { volume: 0.2 })
+  assert.equal(getThemeRevision(570), selected)
+  await updateCache(570, { videoId: '' })
+  assert.deepEqual(changes, [570, 570])
+  unsubscribe()
+  await updateCache(570, { videoId: 'next' })
+  assert.deepEqual(changes, [570, 570])
 })
