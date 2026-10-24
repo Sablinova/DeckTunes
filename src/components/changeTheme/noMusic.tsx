@@ -1,6 +1,6 @@
 import { DialogButton, Focusable } from '@decky/ui'
+import { useState } from 'react'
 import useTranslations from '../../hooks/useTranslations'
-
 import { FaCheck, FaVolumeMute } from 'react-icons/fa'
 
 export default function NoMusic({
@@ -12,96 +12,85 @@ export default function NoMusic({
     title: string
     videoId: string
     audioUrl: string
-  }) => void
+  }) => Promise<void>
 }) {
   const t = useTranslations()
+  const [applying, setApplying] = useState(false)
+  async function apply() {
+    setApplying(true)
+    try {
+      await selectNewAudio({ title: '', videoId: '', audioUrl: '' })
+    } finally {
+      setApplying(false)
+    }
+  }
   return (
-    <div>
-      <Focusable
-        style={{
-          background: 'var(--main-editor-bg-color)',
-          borderRadius: '6px',
-          display: 'grid',
-          gridTemplateRows: '129px max-content max-content',
-          overflow: 'hidden',
-          padding: '10px',
-          width: '230px'
-        }}
-      >
-        <div
+    <Focusable
+      flow-children="row"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '20px minmax(0, 1fr) 144px',
+        alignItems: 'center',
+        gap: '16px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        padding: '14px 16px',
+        borderRadius: '8px',
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.08)'
+      }}
+    >
+      <FaVolumeMute style={{ color: '#aab5c2', width: '18px' }} />
+      <div style={{ minWidth: 0 }}>
+        <strong
           style={{
-            overflow: 'hidden',
-            width: '230px',
-            height: '129px',
-            borderRadius: '6px',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}
-        >
-          <FaVolumeMute size="md" />
-        </div>
-        <p
-          style={{
-            color: 'var(--main-editor-text-color)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            width: '230px',
-            height: '68px'
+            display: 'block',
+            fontSize: '14px',
+            fontWeight: 500,
+            lineHeight: '20px'
           }}
         >
           {t('noMusicLabel')}
-        </p>
-
-        <div
+        </strong>
+        <p
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-            width: '230px'
+            margin: '4px 0 0',
+            fontSize: '13px',
+            lineHeight: '18px',
+            color: '#aab5c2',
+            whiteSpace: 'normal',
+            wordBreak: 'normal'
           }}
         >
-          <DialogButton disabled={true} focusable={false}>
-            {t('play')}
-          </DialogButton>
-          <div style={{ position: 'relative' }}>
-            <DialogButton
-              disabled={selected}
-              focusable={!selected}
-              onClick={() =>
-                selectNewAudio({
-                  title: '',
-                  videoId: '',
-                  audioUrl: ''
-                })
-              }
-            >
-              {selected ? t('selected') : t('select')}
-            </DialogButton>
-            {selected ? (
-              <div
-                style={{
-                  height: '20px',
-                  width: '20px',
-                  position: 'absolute',
-                  bottom: '-6px',
-                  right: '-6px',
-                  background: '#59bf40',
-                  borderRadius: '50%',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <FaCheck />
-              </div>
-            ) : (
-              ''
-            )}
-          </div>
-        </div>
-      </Focusable>
-    </div>
+          {t('noMusicDescription')}
+        </p>
+      </div>
+      <DialogButton
+        disabled={selected || applying}
+        onClick={apply}
+        style={{
+          width: '100%',
+          minWidth: 0,
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          padding: '10px 12px',
+          fontSize: '14px'
+        }}
+      >
+        {selected ? (
+          <span
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <FaCheck />
+            {t('selected')}
+          </span>
+        ) : applying ? (
+          t('applyingTheme')
+        ) : (
+          t('applyTheme')
+        )}
+      </DialogButton>
+    </Focusable>
   )
 }

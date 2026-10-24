@@ -1,5 +1,5 @@
 import { call } from '@decky/api'
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 
 export type Settings = {
   defaultMuted: boolean
@@ -7,48 +7,76 @@ export type Settings = {
   downloadAudio: boolean
   invidiousInstance: string
   volume: number
+  homeScreenMusicPreview: boolean
 }
 
-export const defaultSettings = {
+export const defaultSettings: Settings = {
   defaultMuted: false,
   useYtDlp: false,
   downloadAudio: false,
   invidiousInstance: 'https://inv.tux.pizza',
-  volume: 1
+  volume: 1,
+  homeScreenMusicPreview: false
+}
+
+// All mounted players and the settings panel need the same live settings.
+let snapshot = { settings: defaultSettings, isLoading: true }
+let loading: Promise<void> | undefined
+let saving: Promise<unknown> = Promise.resolve()
+const listeners = new Set<() => void>()
+const subscribe = (listener: () => void) => {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+const getSnapshot = () => snapshot
+const notify = () => listeners.forEach((listener) => listener())
+
+function loadSettings() {
+  loading ??= call<[string, Settings], Partial<Settings> | null>(
+    'get_setting',
+    'settings',
+    defaultSettings
+  )
+    .then((saved) => {
+      snapshot = {
+        settings: { ...defaultSettings, ...saved },
+        isLoading: false
+      }
+      notify()
+    })
+    .catch((error) => {
+      console.error('[DeckTunes] Failed to load settings:', error)
+      snapshot = { ...snapshot, isLoading: false }
+      loading = undefined
+      notify()
+    })
 }
 
 export const useSettings = () => {
-  const [settings, setSettings] = useState<Settings>(defaultSettings)
-
-  const [isLoading, setIsLoading] = useState(true)
-
+  const { settings, isLoading } = useSyncExternalStore(subscribe, getSnapshot)
   useEffect(() => {
-    const getData = async () => {
-      setIsLoading(true)
-      const savedSettings = await call<[string, Settings], Settings>(
-        'get_setting',
-        'settings',
-        settings
-      )
-      setSettings(savedSettings)
-      setIsLoading(false)
-    }
-    getData()
+    loadSettings()
   }, [])
 
-  async function updateSettings(
+  function updateSettings(
     key: keyof Settings,
     value: Settings[keyof Settings]
   ) {
-    setSettings((oldSettings) => {
-      const newSettings = { ...oldSettings, [key]: value }
-      call<[string, Settings], Settings>(
-        'set_setting',
-        'settings',
-        newSettings
-      ).catch(console.error)
-      return newSettings
-    })
+    const newSettings = { ...snapshot.settings, [key]: value }
+    snapshot = { settings: newSettings, isLoading: false }
+    notify()
+    // Preserve ordering when a slider or multiple toggles change quickly.
+    saving = saving
+      .then(() =>
+        call<[string, Settings], Settings>(
+          'set_setting',
+          'settings',
+          newSettings
+        )
+      )
+      .catch(console.error)
   }
 
   function setDefaultMuted(value: Settings['defaultMuted']) {
@@ -68,6 +96,9 @@ export const useSettings = () => {
   function setVolume(value: Settings['volume']) {
     updateSettings('volume', value)
   }
+  function setHomeScreenMusicPreview(value: boolean) {
+    updateSettings('homeScreenMusicPreview', value)
+  }
 
   return {
     settings,
@@ -76,6 +107,7 @@ export const useSettings = () => {
     setDownloadAudio,
     setInvidiousInstance,
     setVolume,
+    setHomeScreenMusicPreview,
     isLoading
   }
 }
