@@ -47,3 +47,5 @@ backend/out
 .pnpm-store/
 cli/
 out/
+bin/
+

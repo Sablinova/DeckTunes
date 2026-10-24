@@ -4,10 +4,10 @@ import {
   ModalRoot,
   SteamSpinner,
   TextField,
-  showModal,
-  useParams
+  showModal
 } from '@decky/ui'
 import { useEffect, useState } from 'react'
+import { useParams } from '../../hooks/useParams'
 import { useSettings } from '../../hooks/useSettings'
 import AudioPlayer from './audioPlayer'
 import { getCache, updateCache } from '../../cache/musicCache'

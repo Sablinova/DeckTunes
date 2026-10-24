@@ -4,6 +4,7 @@ import {
   DropdownItem,
   Menu,
   MenuItem,
+  Navigation,
   PanelSection,
   PanelSectionRow,
   ProgressBarWithInfo,
@@ -20,6 +21,7 @@ import { useSettings } from '../../hooks/useSettings'
 import useTranslations from '../../hooks/useTranslations'
 import {
   FaDownload,
+  FaGamepad,
   FaUndo,
   FaSave,
   FaVolumeUp,
@@ -39,6 +41,8 @@ import { getResolver } from '../../actions/audio'
 import PanelSocialButton from './socialButton'
 import YtdlpUpdateSection from './YtdlpUpdateSection'
 import { useHomePreviewDiagnostics } from '../../lib/homePreviewDiagnostics'
+import { useCurrentApp } from '../../hooks/useCurrentApp'
+import GamePickerModal from './GamePickerModal'
 
 export default function Index() {
   const {
@@ -53,6 +57,7 @@ export default function Index() {
   } = useSettings()
 
   const t = useTranslations()
+  const currentApp = useCurrentApp()
   const homeDiagnostics = useHomePreviewDiagnostics()
   const [toolsOpen, setToolsOpen] = useState(false)
 
@@ -177,6 +182,39 @@ export default function Index() {
 
   return (
     <div>
+      {currentApp && (
+        <PanelSection title={t('currentGame') || 'Current Game'}>
+          <PanelSectionRow>
+            <ButtonItem
+              layout="below"
+              icon={<FaGamepad />}
+              onClick={() => {
+                Navigation.Navigate(`/gamethememusic/${currentApp.appId}`)
+              }}
+            >
+              🎵 {t('changeThemeMusic')} ({currentApp.appName})
+            </ButtonItem>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+
+      <PanelSection title={t('chooseGame') || 'Choose Game'}>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            description={
+              t('chooseGameDescription') ||
+              'Select any game from your library to customize its music.'
+            }
+            onClick={() => {
+              showModal(<GamePickerModal />)
+            }}
+          >
+            🎮 {t('chooseGame') || 'Choose Game from Library...'}
+          </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+
       <PanelSection title={t('playbackSection')}>
         <PanelSectionRow>
           <SliderField

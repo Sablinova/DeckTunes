@@ -3,10 +3,10 @@ import {
   Focusable,
   SliderField,
   PanelSection,
-  PanelSectionRow,
-  useParams
+  PanelSectionRow
 } from '@decky/ui'
 import { useEffect, useState } from 'react'
+import { useParams } from '../../hooks/useParams'
 import { getCache, updateCache } from '../../cache/musicCache'
 
 import useThemeMusic from '../../hooks/useThemeMusic'

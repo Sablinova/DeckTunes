@@ -1,6 +1,7 @@
-import { Tabs, useParams } from '@decky/ui'
+import { Tabs } from '@decky/ui'
 import { useEffect, useState } from 'react'
 
+import { useParams } from '../../hooks/useParams'
 import useTranslations from '../../hooks/useTranslations'
 import ChangePage from './changePage'
 import AboutPage from './aboutPage'

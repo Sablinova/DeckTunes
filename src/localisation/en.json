@@ -101,5 +101,10 @@
     "ytdlpCheckFailed": "Could not check for updates",
     "ytdlpUpdateFailed": "Update failed",
     "ytdlpUpdateSuccess": "yt-dlp updated",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "currentGame": "Current Game",
+    "chooseGame": "Choose Game from Library",
+    "chooseGameDescription": "Select any game to customize its theme music.",
+    "searchGames": "Search games...",
+    "noGamesFound": "No games found."
 }
