@@ -86,6 +86,11 @@ class PersistentBinaryTests(unittest.TestCase):
         with patch.object(asyncio, "create_subprocess_exec", AsyncMock(return_value=verified)):
             result = asyncio.run(plugin.update_ytdlp())
         self.assertTrue(result["success"])
+        self.code["aiohttp"].ClientSession.assert_called_with(
+            timeout=self.code["aiohttp"].ClientTimeout.return_value,
+            max_line_size=65536,
+            max_field_size=65536,
+        )
         saved = Path(self.code["get_ytdlp_path"]())
         self.assertEqual(saved.parent.parent, self.root / "runtime")
         self.assertEqual(saved.read_bytes(), b"future-in-app-update")

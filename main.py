@@ -12,6 +12,7 @@ import logging
 import platform
 import shutil
 import tempfile
+import urllib.parse
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from functools import partial
 
@@ -53,8 +54,9 @@ class AudioHTTPRequestHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         # Only serve files from /audio/ path
-        if self.path.startswith("/audio/"):
-            filename = self.path[7:]  # Remove /audio/ prefix
+        parsed_path = urllib.parse.urlparse(self.path).path
+        if parsed_path.startswith("/audio/"):
+            filename = urllib.parse.unquote(parsed_path[7:])  # Remove /audio/ prefix
 
             # Sanitize filename
             if ".." in filename or "/" in filename or "\\" in filename:
@@ -63,7 +65,7 @@ class AudioHTTPRequestHandler(SimpleHTTPRequestHandler):
 
             filepath = os.path.join(self.music_path, filename)
             if os.path.exists(filepath) and os.path.isfile(filepath):
-                self.path = "/" + filename
+                self.path = "/" + urllib.parse.quote(filename)
                 super().do_GET()
             else:
                 self.send_error(404, "File not found")
@@ -415,7 +417,9 @@ class Plugin:
     async def download_url(self, url: str, id: str):
         logger.info(f"Downloading file from URL: {url}")
         timeout = aiohttp.ClientTimeout(total=600)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with aiohttp.ClientSession(
+            timeout=timeout, max_line_size=65536, max_field_size=65536
+        ) as session:
             res = await session.get(url, ssl=self.ssl_context)
             res.raise_for_status()
             file_path = os.path.join(self.music_path, f"{id}.webm")
@@ -506,7 +510,9 @@ class Plugin:
         try:
             logger.info("Fetching latest yt-dlp release from GitHub...")
             timeout = aiohttp.ClientTimeout(total=30)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with aiohttp.ClientSession(
+                timeout=timeout, max_line_size=65536, max_field_size=65536
+            ) as session:
                 async with session.get(
                     "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
                     ssl=self.ssl_context,
@@ -590,7 +596,9 @@ class Plugin:
             logger.info(f"Downloading latest yt-dlp from {download_url}")
 
             timeout = aiohttp.ClientTimeout(total=600)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with aiohttp.ClientSession(
+                timeout=timeout, max_line_size=65536, max_field_size=65536
+            ) as session:
                 async with session.get(download_url, ssl=self.ssl_context) as response:
                     if response.status != 200:
                         raise Exception(
